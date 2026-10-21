@@ -432,6 +432,58 @@
   .guide-content code{ font-size:.9em; }
   .guide-nav{ padding-top:16px; border-top:1px dashed var(--rule-strong); margin-top:18px; }
   .toast{ z-index:60; }
+
+  /* Home assistant: a quiet workspace within the ledger. */
+  .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+  .ledger-assistant{ margin:0 0 22px; padding:20px 18px 0; border:1px solid var(--rule-strong); border-radius:14px; background:linear-gradient(145deg,var(--card),#e5ebdf); overflow:hidden; }
+  .assistant-heading{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; }
+  .assistant-mark svg{ width:18px; height:18px; }
+  .assistant-prompts svg{ width:12px; height:12px; vertical-align:middle; }
+  .assistant-heading .label{ font-size:10px; letter-spacing:.12em; margin-bottom:7px; }
+  .assistant-heading h2{ margin:0; font:600 24px/1.15 'Spectral',serif; letter-spacing:-.025em; max-width:240px; }
+  .assistant-mark{ flex:none; width:36px; height:36px; display:grid; place-items:center; border:1px solid var(--rule-strong); border-radius:50%; font-size:22px; }
+  .assistant-composer{ display:flex; align-items:center; gap:6px; padding:6px; border:1px solid var(--rule-strong); border-radius:12px; background:var(--card); box-shadow:0 3px 10px rgba(27,58,45,.04); }
+  .assistant-composer:focus-within{ border-color:var(--ink); outline:2px solid rgba(27,58,45,.12); outline-offset:2px; }
+  .assistant-composer input{ min-width:0; flex:1; width:100%; border:0; background:transparent; color:var(--ink); padding:10px 6px; font:400 16px/1.4 'Inter',sans-serif; outline:none; }
+  .assistant-composer input::placeholder{ color:var(--ink-mute); opacity:1; }
+  .assistant-composer button{ flex:none; width:44px; height:44px; border:0; border-radius:9px; background:var(--ink); color:var(--card); display:grid; place-items:center; cursor:pointer; }
+  .assistant-composer button svg{ width:22px; height:22px; }
+  .assistant-composer button:hover{ background:var(--good); }
+  .assistant-help{ font-size:11px; color:var(--ink-soft); line-height:1.5; margin:9px 1px 3px; }
+  .assistant-prompts{ display:flex; align-items:center; flex-wrap:wrap; gap:2px 12px; padding:5px 0 12px; font-size:11px; color:var(--ink-soft); }
+  .assistant-prompts button{ padding:9px 0; min-height:40px; border:0; background:transparent; color:var(--ink); cursor:pointer; font:500 12px 'Inter',sans-serif; text-decoration:underline; text-decoration-color:var(--rule-strong); text-underline-offset:4px; }
+  .assistant-prompts button span{ margin-left:3px; color:var(--ink-soft); }
+  .assistant-source{ margin:0 -18px; padding:11px 18px; font-size:10px; line-height:1.5; color:var(--ink-soft); background:rgba(27,58,45,.035); border-top:1px solid var(--rule); }
+  .assistant-source::before{ content:''; display:inline-block; width:5px; height:5px; border-radius:50%; background:var(--good); margin:0 6px 1px 0; }
+  .assistant-source.is-offline::before{ background:var(--stamp); }
+  .assistant-history-head{ display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--rule); padding-top:10px; font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); }
+  .assistant-history-head[hidden]{ display:none; }
+  .assistant-history-head button{ min-height:40px; padding:4px 0 4px 16px; border:0; background:none; color:var(--ink-soft); text-decoration:underline; cursor:pointer; font:400 12px 'Inter',sans-serif; text-transform:none; letter-spacing:0; }
+  .assistant-history{ max-height:460px; max-height:55dvh; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }
+  .assistant-turn{ padding:4px 0 16px; }
+  .assistant-question{ margin:0 0 10px 28px; padding:10px 13px; border-radius:12px 12px 2px 12px; background:var(--ink); color:var(--card); font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
+  .assistant-answer{ padding:15px; border:1px solid var(--rule); border-radius:2px 12px 12px; background:var(--card); overflow-wrap:anywhere; }
+  .assistant-result-label{ font-size:10px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.08em; margin:0 0 8px; }
+  .assistant-value{ margin:0 0 8px; font:600 30px/1.15 'Spectral',serif; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+  .assistant-detail{ margin:6px 0 0; font-size:12px; line-height:1.6; color:var(--ink-soft); }
+  .assistant-empty{ font:600 17px/1.3 'Spectral',serif; margin:0 0 6px; }
+  .assistant-answer.is-error{ border-color:var(--rule-strong); }
+  .assistant-answer-source{ font-size:10px; line-height:1.5; color:var(--ink-mute); margin:12px 0 0; padding-top:9px; border-top:1px solid var(--rule); }
+  .assistant-records{ list-style:none; padding:0; margin:0; }
+  .assistant-records li{ display:flex; gap:10px; align-items:baseline; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--rule); }
+  .assistant-records li:last-child{ padding-bottom:0; border-bottom:0; }
+  .assistant-records li div{ min-width:0; }
+  .assistant-records strong{ display:block; font-size:13px; font-weight:600; }
+  .assistant-records span{ display:block; font-size:10px; line-height:1.5; margin-top:4px; color:var(--ink-soft); overflow-wrap:anywhere; }
+  .assistant-records b{ flex:none; font-size:12px; font-weight:500; font-variant-numeric:tabular-nums; }
+  .assistant-comparison{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:12px 0; }
+  .assistant-comparison span{ display:block; color:var(--ink-soft); font-size:11px; margin-bottom:5px; }
+  .assistant-comparison strong{ font:600 20px 'Spectral',serif; overflow-wrap:anywhere; }
+  .assistant-categories p{ display:flex; justify-content:space-between; gap:8px; margin:12px 0 6px; font-size:12px; }
+  .assistant-categories b{ font-weight:500; font-variant-numeric:tabular-nums; }
+  .assistant-category-bar{ height:4px; background:var(--rule); border-radius:3px; overflow:hidden; }
+  .assistant-category-bar span{ height:100%; display:block; background:var(--ink); border-radius:3px; }
+  @media (max-width:350px){ .ledger-assistant{ padding-left:13px; padding-right:13px; } .assistant-source{ margin-left:-13px; margin-right:-13px; padding-left:13px; padding-right:13px; } .assistant-mark{ display:none; } .assistant-comparison{ grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
@@ -455,7 +507,18 @@
   <p class="banner" id="banner" role="status" hidden></p>
 
   <main id="main">
-    <section class="panel" id="panel-home" role="tabpanel" aria-labelledby="tab-home"></section>
+    <section class="panel" id="panel-home" role="tabpanel" aria-labelledby="tab-home"><section class="ledger-assistant" aria-labelledby="assistantTitle">
+      <div class="assistant-heading"><div><p class="label">A little clarity</p><h2 id="assistantTitle">Know where your money goes.</h2></div><span class="assistant-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 18 18 6M6 6h12v12"/></svg></span></div>
+      <form id="assistantForm" autocomplete="off">
+        <label class="sr-only" for="assistantInput">Ask about your ledger</label>
+        <div class="assistant-composer"><input id="assistantInput" type="text" maxlength="300" required placeholder="Ask about your spending…" enterkeyhint="send" aria-describedby="assistantHelp"><button id="assistantSend" type="submit" aria-label="Send question"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button></div>
+        <p id="assistantHelp" class="assistant-help">Explore your saved records. Questions only for now.</p>
+      </form>
+      <div class="assistant-prompts" aria-label="Suggested questions"><span>Try</span><button type="button" data-question="What's my biggest expense this month?">Biggest expense <span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 18 18 6M6 6h12v12"/></svg></span></button><button type="button" data-question="How much salary did I receive this year?">Salary this year <span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 18 18 6M6 6h12v12"/></svg></span></button></div>
+      <div class="assistant-history-head" id="chatHeading" hidden><span>Your conversation</span><button type="button" data-act="clearchat">Clear</button></div>
+      <div id="chatHistory" class="assistant-history" role="log" aria-live="polite" aria-label="Ledger questions and answers" aria-relevant="additions"></div>
+      <p class="assistant-source" id="assistantSource" role="status">Refresh once to make your records available here.</p>
+    </section><div id="homeSummary"></div></section>
     <section class="panel" id="panel-plan" role="tabpanel" aria-labelledby="tab-plan"></section>
     <section class="panel" id="panel-add" role="tabpanel" aria-labelledby="tab-add"></section>
     <section class="panel" id="panel-funds" role="tabpanel" aria-labelledby="tab-funds"></section>
@@ -498,14 +561,7 @@
       <div id="settingsView">
         <p id="localStatus" role="status" style="font-size:13px;line-height:1.5"></p>
         <div id="settingsBody"></div>
-        <div class="guide-nav"><button class="btn2" id="assistantBtn" type="button" data-act="openassistant">Ask about my ledger</button> <button class="btn2" id="guideBtn" type="button" data-act="openguide">Guide</button></div>
-      </div>
-      <div id="assistantView" hidden>
-        <button class="btn2" id="assistantBack" type="button" data-act="backassistant">Back to settings</button>
-        <p class="hint" style="margin:14px 0">Read-only local assistant · supported questions use cached records, with no cloud AI. Offline writes and a language model are not enabled yet.</p>
-        <div class="btn-row"><button class="btn2" type="button" data-question="What's my biggest expense this month?">Biggest expense</button><button class="btn2" type="button" data-question="How much salary did I receive this year?">Salary this year</button><button class="btn2" type="button" data-question="Compare this month's expenses with last month's.">Compare months</button></div>
-        <div id="chatHistory" role="log" aria-live="polite" style="max-height:40vh;overflow-y:auto;margin:14px 0"></div>
-        <form id="assistantForm" autocomplete="off"><label class="fld"><span class="label">Ask a question</span><input id="assistantInput" type="text" maxlength="300" required placeholder="Show my top five expenses"></label><button class="btn2 solid" type="submit">Ask</button></form>
+        <div class="guide-nav"><button class="btn2" id="guideBtn" type="button" data-act="openguide">Guide</button></div>
       </div>
       <div id="guideView" hidden>
         <button class="btn2" id="guideBack" type="button" data-act="backsettings">Back to settings</button>
@@ -787,10 +843,11 @@
   var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   var TITLES = { home:'Overview', plan:'Plan', add:'Add record', funds:'Funds', loans:'Loans' };
-  var data = null, busy = false, saving = false, ledgerSnapshot = null;
+  var data = null, busy = false, saving = false, ledgerSnapshot = null, snapshotStale = false;
   var localStatus = 'No complete local snapshot yet.';
   function setLocalStatus(message){
     localStatus = message;
+    updateAssistantSource();
     var el = $('#localStatus'); if (el) el.textContent = message;
   }
   var tab = store.get('sl2_tab'); if (!TITLES[tab]) tab = 'home';
@@ -828,7 +885,7 @@
   /* one write: done(result|null, errorText) */
   function mutate(fn, args, done){
     if (saving) return; saving = true;
-    call.apply(null, [fn, pin].concat(args)).then(function(res){ applyState(res.state); setLocalStatus('Cloud save completed. Refresh to update the full local snapshot.'); return { res: res }; },
+    call.apply(null, [fn, pin].concat(args)).then(function(res){ applyState(res.state); snapshotStale = true; setLocalStatus('Cloud save completed. Refresh to update the full local snapshot.'); return { res: res }; },
       function(err){ return { err: errText(err) }; })
     .then(function(o){ saving = false; if (done) done(o.res || null, o.err || ''); })
     .catch(function(e){ saving = false; if (window.console) console.error(e); toast('Something went wrong showing the result. Pull to refresh.', true); });
@@ -925,39 +982,70 @@
     $('#settingsBody').innerHTML = data && data.setupDone ? settingsHTML(data) : setupCard();
   }
   function showGuide(show){
-    $('#assistantView').hidden = true;
     $('#settingsView').hidden = show; $('#guideView').hidden = !show;
     $('#setTitle').textContent = show ? 'Guide' : 'Settings';
     $('#setClose').setAttribute('aria-label', show ? 'Close guide' : 'Close settings');
     $('#settingsModal .sheet').scrollTop = 0;
     (show ? $('#guideBack') : $('#guideBtn')).focus();
   }
-  function showAssistant(show){
-    $('#settingsView').hidden = show; $('#guideView').hidden = true; $('#assistantView').hidden = !show;
-    $('#setTitle').textContent = show ? 'Ledger assistant' : 'Settings';
-    $('#setClose').setAttribute('aria-label', show ? 'Close assistant' : 'Close settings');
-    $('#settingsModal .sheet').scrollTop = 0;
-    (show ? $('#assistantInput') : $('#assistantBtn')).focus();
+  function updateAssistantSource(){
+    var el = $('#assistantSource'); if(!el) return;
+    var offline = navigator.onLine === false;
+    el.classList.toggle('is-offline', offline);
+    if(!ledgerSnapshot){ el.textContent = offline ? 'Device offline · Connect and refresh to download your ledger.' : 'Refresh to download your ledger before asking a question.'; return; }
+    var date = new Date(ledgerSnapshot.capturedAt);
+    var stamp = new Intl.DateTimeFormat('en', {timeZone:ledgerSnapshot.timezone,month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(date);
+    el.textContent = (offline ? 'Device offline · ' : '') + (snapshotStale ? 'New changes available · Refresh for current answers.' : 'Saved records · Updated ' + stamp);
   }
   function askLedger(text){
     var history = $('#chatHistory');
-    function message(label, content){
-      var el = document.createElement('div'); el.className = 'card'; el.style.whiteSpace = 'pre-wrap';
-      el.textContent = label + '\n' + content; history.appendChild(el);
-      while(history.children.length > 40) history.removeChild(history.firstChild);
-      history.scrollTop = history.scrollHeight;
-    }
-    message('You', text);
+    $('#chatHeading').hidden = false;
+    var turn = document.createElement('div'); turn.className = 'assistant-turn';
+    var question = document.createElement('p'); question.className = 'assistant-question'; question.textContent = text;
+    var answer = document.createElement('div'); answer.className = 'assistant-answer';
+    turn.appendChild(question); turn.appendChild(answer); history.appendChild(turn);
+    while(history.children.length > 10) history.removeChild(history.firstChild);
+    function paragraph(content, cls){ var el = document.createElement('p'); el.className = cls || 'assistant-detail'; el.textContent = content; answer.appendChild(el); }
     try {
       var q = LedgerQuery.interpret(text, ledgerSnapshot), r = LedgerQuery.query(ledgerSnapshot, q);
-      function money(n){ return ledgerSnapshot.currency + nf.format(n / 100); }
-      var answer = r.count ? r.count + ' matching ' + r.kind + ' records. Total: ' + money(r.totalMinor) + '.' : 'No matching ' + r.kind + ' records in this range.';
-      if(r.rows.length) answer = r.rows.map(function(row){return row.date + ' · ' + money(row.minor) + ' · ' + (row.note || row.source || row.id) + ' [' + row.id + ']';}).join('\n');
-      if(r.operation === 'compare') answer = 'This month: ' + money(r.totalMinor) + ' (' + r.count + ' records). Last month: ' + money(r.previousMinor) + ' (' + r.previousCount + ' records). Difference: ' + money(r.differenceMinor) + '.';
-      if(r.categories && r.categories.length) answer = r.categories.map(function(c){return c.name + ': ' + money(c.minor);}).join('\n');
-      if(r.operation === 'cashflow') answer = 'Recorded income: ' + money(r.incomeMinor) + '. Budget spending: ' + money(r.expenseMinor) + '. Difference: ' + money(r.netMinor) + '. Fund transfers are excluded; loan payments count only when recorded as spending.';
-      message('Assistant · ' + r.range.replace(/_/g,' ') + ' · snapshot ' + ledgerSnapshot.capturedAt, answer);
-    } catch(e){ message('Assistant', e.message); }
+      function money(n){ return (n < 0 ? '−' : '') + ledgerSnapshot.currency + nf.format(Math.abs(n) / 100); }
+      var range = {all:'All recorded dates',today:'Today',this_month:'This month',last_month:'Last month',this_year:'This year'}[r.range];
+      paragraph(range, 'assistant-result-label');
+      if(r.operation === 'compare') {
+        var comparison = document.createElement('div'); comparison.className = 'assistant-comparison';
+        [['This month', r.totalMinor], ['Last month', r.previousMinor]].forEach(function(item){
+          var cell = document.createElement('div'), label = document.createElement('span'), value = document.createElement('strong'); label.textContent = item[0]; value.textContent = money(item[1]); cell.appendChild(label); cell.appendChild(value); comparison.appendChild(cell);
+        }); answer.appendChild(comparison);
+        paragraph(money(Math.abs(r.differenceMinor)) + (r.differenceMinor > 0 ? ' more spending this month.' : r.differenceMinor < 0 ? ' less spending this month.' : ' change in spending.') + ' Based on ' + r.count + ' records this month and ' + r.previousCount + ' last month.');
+      } else if(r.operation === 'cashflow') {
+        paragraph(money(r.netMinor), 'assistant-value');
+        paragraph('Income ' + money(r.incomeMinor) + ' − spending ' + money(r.expenseMinor) + '. Fund transfers excluded; loan payments count only when recorded as spending.');
+      } else if(!r.count) {
+        paragraph('No matching records', 'assistant-empty'); paragraph('Nothing matches this question in the saved ledger. Try another period or refresh for newer records.');
+      } else if(r.rows.length) {
+        if(r.rows.length === 1) paragraph(money(r.rows[0].minor), 'assistant-value');
+        var list = document.createElement('ol'); list.className = 'assistant-records';
+        r.rows.forEach(function(row){
+          var li = document.createElement('li'), info = document.createElement('div'), title = document.createElement('strong'), detail = document.createElement('span'), amount = document.createElement('b');
+          var cat = ledgerSnapshot.tables.CATEGORIES.find(function(c){return c.record.category_id === row.categoryId;});
+          title.textContent = cat ? cat.record.name : row.source || row.incomeKind || 'Record';
+          detail.textContent = fmtLong(row.date) + (row.note ? ' · ' + row.note : '') + ' · ' + row.id;
+          info.appendChild(title); info.appendChild(detail); li.appendChild(info);
+          if(r.rows.length > 1){ amount.textContent = money(row.minor); li.appendChild(amount); } list.appendChild(li);
+        }); answer.appendChild(list);
+      } else if(r.categories && r.categories.length) {
+        var group = document.createElement('div'); group.className = 'assistant-categories';
+        r.categories.forEach(function(c){
+          var row = document.createElement('div'), label = document.createElement('p'), bar = document.createElement('div'), fill = document.createElement('span');
+          var name = document.createElement('span'), value = document.createElement('b'); name.textContent = c.name; value.textContent = money(c.minor); label.appendChild(name);label.appendChild(value);
+          bar.className = 'assistant-category-bar'; fill.style.width = (r.totalMinor ? c.minor/r.totalMinor*100 : 0) + '%';bar.appendChild(fill);row.appendChild(label);row.appendChild(bar);group.appendChild(row);
+        }); answer.appendChild(group);
+      } else {
+        paragraph(money(r.totalMinor), 'assistant-value'); paragraph('Across ' + r.count + ' ' + (r.kind === 'income' ? 'income' : 'expense') + (r.count === 1 ? ' entry.' : ' entries.'));
+      }
+      paragraph((snapshotStale ? 'Refresh to include your latest changes. ' : '') + 'From the ledger saved ' + new Intl.DateTimeFormat('en',{timeZone:ledgerSnapshot.timezone,month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(ledgerSnapshot.capturedAt)) + '.', 'assistant-answer-source');
+    } catch(e){ answer.classList.add('is-error'); paragraph('Let’s try a different question', 'assistant-empty'); paragraph(e.message); }
+    history.scrollTop = history.scrollHeight;
   }
   function openSettings(){
     showGuide(false);
@@ -1236,9 +1324,10 @@
     return '<div class="card"><div class="skel" style="width:40%"></div><div class="skel" style="height:44px;width:80%"></div><div class="skel" style="width:60%"></div></div>';
   }
   function render(){
-    if (!data) { $$('.panel').forEach(function(p){ p.innerHTML = skeleton(); }); return; }
-    if (!data.setupDone) { $$('.panel').forEach(function(p){ p.innerHTML = setupCard(); }); $('#eyebrow').textContent = data.app.name; fillSettings(); return; }
-    $('#panel-home').innerHTML = homeHTML(data);
+    if (!data) { $$('.panel').forEach(function(p){ (p.id === 'panel-home' ? $('#homeSummary') : p).innerHTML = skeleton(); }); return; }
+    if (!data.setupDone) { $$('.panel').forEach(function(p){ (p.id === 'panel-home' ? $('#homeSummary') : p).innerHTML = setupCard(); }); $('#eyebrow').textContent = data.app.name; fillSettings(); return; }
+    $('#homeSummary').innerHTML = homeHTML(data);
+    updateAssistantSource();
     fillPlan(); fillAdd();
     $('#panel-funds').innerHTML = fundsHTML(data);
     fillLoans(); fillSettings();
@@ -1273,7 +1362,7 @@
     setLocalStatus('Refreshing complete ledger…');
     return call('getLedgerSnapshot', pin).then(function(snapshot){
       LedgerLocal.validate(snapshot);
-      ledgerSnapshot = snapshot;
+      ledgerSnapshot = snapshot; snapshotStale = false;
       applyState(snapshot.state);
       return LedgerLocal.save(snapshot).then(function(){
         store.del('sl2_cache');
@@ -1301,10 +1390,10 @@
     if (!t) return;
     if (t.hasAttribute('data-tab')) { showTab(t.getAttribute('data-tab')); return; }
     var act = t.getAttribute('data-act'), id = t.getAttribute('data-id');
-    if (act === 'opensettings') openSettings();
+    if (act === 'clearchat') { $('#chatHistory').textContent = ''; $('#chatHeading').hidden = true; $('#assistantInput').focus(); }
+    else if (act === 'opensettings') openSettings();
     else if (act === 'closesettings') closeSettings();
-    else if (act === 'openassistant') showAssistant(true);
-    else if (act === 'backassistant') showAssistant(false);
+
     else if (act === 'openguide') showGuide(true);
     else if (act === 'backsettings') showGuide(false);
     else if (act === 'addtype') { addType = t.getAttribute('data-v'); delete cids.add; fillAdd(); if (addType === 'Loan') prefillLoan(); }
@@ -1342,6 +1431,8 @@
       mutate('generatePeriods', [y], function(res, err){ toast(err || 'Pay periods for ' + y + ' are ready.', !!err); });
     }
   });
+  window.addEventListener('online', updateAssistantSource);
+  window.addEventListener('offline', updateAssistantSource);
   $('#assistantForm').addEventListener('submit', function(e){ e.preventDefault(); var input = $('#assistantInput'); var text = input.value.trim(); if(text){askLedger(text); input.value = ''; input.focus();} });
   $('#refresh').addEventListener('click', load);
   $('#settingsModal').addEventListener('click', function(e){ if (e.target === this) closeSettings(); });

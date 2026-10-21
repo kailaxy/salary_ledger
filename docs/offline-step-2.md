@@ -1,6 +1,6 @@
 # Step 2: deterministic read-only assistant
 
-Update `Index.html` in Apps Script and deploy a new version of the existing deployment. Keep `Code.gs` from step 1. No APK rebuild or sheet migration is required. Open Settings → Ask about my ledger. Refresh online first if the complete snapshot has not been downloaded.
+Update `Index.html` in Apps Script and deploy a new version of the existing deployment. Keep `Code.gs` from step 1. No APK rebuild or sheet migration is required. Use the question field directly on Home. Refresh online first if the complete snapshot has not been downloaded.
 
 Supported examples:
 
@@ -18,4 +18,4 @@ Queries use only the full in-memory cached snapshot and never call an AI or netw
 
 Chat remains in memory, bounded to 40 messages, and renders plain text rather than interpreting record notes as HTML. Conversation history is not durable. No model or write actions are enabled. The app still requires internet to load after a cold launch; local calculations work without network once the page and complete snapshot are available. Offline cold launch, authentication redesign, durable outbox replay, conflict resolution, native inference and confirmed writes remain outstanding.
 
-Run `npm ci && npm test` from `tests/`. Ten automated tests cover the engine and prior snapshot/storage behavior. This step has not been browser- or phone-tested. On the phone, refresh, compare answers against the Sheet, then disable connectivity while the page is loaded and repeat the suggested questions. Verify malformed questions receive an unsupported-request message and no write occurs. Settings → Guide and all existing ledger forms should remain available.
+Run `npm ci && npm test` from `tests/`. Ten automated tests cover the engine and prior snapshot/storage behavior. The subsequent Home UI revision has been tested in Chromium with mocked ledger data; phone verification remains outstanding. On the phone, refresh, compare answers against the Sheet, then disable connectivity while the page is loaded and repeat the suggested questions. Verify malformed questions receive an unsupported-request message and no write occurs. Settings → Guide and all existing ledger forms should remain available.
