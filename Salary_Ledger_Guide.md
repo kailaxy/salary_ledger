@@ -35,7 +35,7 @@ One form for everything you record. Pick the type at the top:
 - **Income**: salary, bonus or other, with an optional source such as your employer. You can enter more than one per pay period.
 - **Loan pay**: choose the loan; the amount is filled in with the next installment. Leave **Also count it as spending** ticked if the payment should reduce your budget in a category (for example, Loan Payment).
 
-Recent entries appear below the form. To remove one, tap **Delete** and then **Sure?**. To fix a mistake, delete the entry and add it again.
+Recent entries appear below the form. To remove one, tap **Delete** and then **Sure?**. For income and ordinary expenses, tap **Edit**, change the fields, and review before saving. Fund and loan entries still use the online workflow.
 
 ### Funds
 Every fund with its balance, progress toward its target, how far you have to go, and whether you are on track against your plan so far. **New fund** starts a fund from here.
@@ -69,4 +69,4 @@ The setup creates ten tabs: SETTINGS, PAY_PERIODS, INCOME, CATEGORIES, FUND_GOAL
 - **"Set up (run once)" message in the app**: run the setup from the sheet's Salary Ledger menu, then refresh.
 - **"Saving is off until you set a PIN"**: use Salary Ledger → Set or change PIN in the sheet.
 - **"Too many wrong tries"**: wait 10 minutes and try again.
-- **A save seemed to fail**: tap Save again. A retry never records the same entry twice.
+- **A save seemed to fail**: income and ordinary expenses stay in the pending list and retry safely. For fund or loan saves, refresh and check the sheet before retrying an uncertain save.

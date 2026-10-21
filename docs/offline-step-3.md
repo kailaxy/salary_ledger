@@ -18,6 +18,7 @@ The request uses:
 ```json
 {
   "version": 1,
+  "ledgerId": "spreadsheet_id_from_snapshot",
   "mutationId": "request_unique_uuid_here",
   "operation": "add",
   "table": "TRANSACTIONS",
@@ -34,7 +35,7 @@ The request uses:
 
 Generate IDs once and retain them across retries. Record IDs are permanent: no temporary mapping is needed. For INCOME use an `inc_` record ID and values `periodId`, `date`, `amountMinor`, `kind` (SALARY/BONUS/OTHER), `source`, and `note`. Additions require all fields, including empty optional text. Edits use `operation: "edit"`, a new mutation ID, `baseFingerprint` from a complete snapshot or prior committed receipt, and only changed value fields. One request affects one row. Amounts are positive integer hundredths of the configured currency, at most the existing MAX_AMOUNT. Unknown fields, invalid dates, mismatched foreign keys and leading formula markers in text are rejected. Edits to loan-linked expense IDs are refused.
 
-Responses distinguish `status: "committed"` and `status: "conflict"`. A committed receipt includes the record ID, resulting record and fingerprint. A conflict includes the current remote row and fingerprint, or null for a missing row. Never silently resubmit a conflict with a new fingerprint: obtain explicit user resolution first. Reusing a mutation ID with a different payload is rejected. Repeating a committed request returns the original receipt even if later mutations have changed that record; pull a fresh snapshot for the current state.
+Responses distinguish `status: "committed"` and `status: "conflict"`. A committed receipt includes the record ID, resulting record, fingerprint and committedAt timestamp. A conflict includes the current remote row and fingerprint, or null for a missing row. Never silently resubmit a conflict with a new fingerprint: obtain explicit user resolution first. Reusing a mutation ID with a different payload is rejected. Repeating a committed request returns the original receipt even if later mutations have changed that record; pull a fresh snapshot for the current state.
 
 ## Recovery and limitations
 

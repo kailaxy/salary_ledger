@@ -495,6 +495,16 @@
   .assistant-category-bar{ height:4px; background:var(--rule); border-radius:3px; overflow:hidden; }
   .assistant-category-bar span{ height:100%; display:block; background:var(--ink); border-radius:3px; }
   @media (max-width:350px){ .ledger-assistant{ padding-left:13px; padding-right:13px; } .assistant-source{ margin-left:-13px; margin-right:-13px; padding-left:13px; padding-right:13px; } .assistant-mark{ display:none; } .assistant-comparison{ grid-template-columns:1fr; } }
+  .pending-panel summary{ min-height:32px; cursor:pointer; font-size:13px; font-weight:600; }
+  .pending-panel[hidden]{ display:none; }
+  .pending-item{ border-top:1px solid var(--rule); padding:12px 0; overflow-wrap:anywhere; }
+  .pending-item .btn2{ margin-top:10px; }
+  .pending-item .sub{ margin-top:6px; }
+  .review-record{ white-space:pre-wrap; font-size:14px; line-height:1.65; margin:6px 0 18px; overflow-wrap:anywhere; }
+  #recent .rec{ grid-template-columns:minmax(0,1fr) auto; }
+  .rec-actions{ display:flex; flex-wrap:wrap; justify-content:flex-end; gap:12px; align-items:center; grid-column:1 / -1; }
+  .rec-actions .btn2{ min-height:36px; padding:4px 10px; font-size:12px; }
+  .pending-tag{ font-size:11px; color:var(--ink-soft); }
 </style>
 </head>
 <body>
@@ -518,7 +528,7 @@
   <p class="banner" id="banner" role="status" hidden></p>
 
   <main id="main">
-    <section class="panel" id="panel-home" role="tabpanel" aria-labelledby="tab-home"><section class="ledger-assistant" aria-label="Ledger assistant" tabindex="-1">
+    <section class="panel" id="panel-home" role="tabpanel" aria-labelledby="tab-home"><details class="card pending-panel" id="pendingPanel" hidden><summary id="pendingSummary">Pending changes</summary><div id="pendingBody"></div></details><section class="ledger-assistant" aria-label="Ledger assistant" tabindex="-1">
       <div class="assistant-heading"><div><p class="label">A little clarity</p><h2 id="assistantTitle">Know where your money goes.</h2></div><button class="assistant-collapse" type="button" data-act="collapseassistant" aria-label="Minimize ledger assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 12h12"/></svg></button></div>
       <form id="assistantForm" autocomplete="off">
         <label class="sr-only" for="assistantInput">Ask about your ledger</label>
@@ -561,6 +571,15 @@
     </button>
   </nav>
 
+  <div class="modal" id="entryReview" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="reviewTitle">
+      <div class="sheet-head"><h2 id="reviewTitle">Review entry</h2></div>
+      <p class="label">Before</p><p class="review-record" id="reviewBefore"></p>
+      <p class="label">After</p><p class="review-record" id="reviewAfter"></p>
+      <p class="sub">Nothing changes until you confirm.</p>
+      <div class="btn-row" style="margin-top:16px"><button class="btn2" id="reviewCancel" type="button">Go back</button><button class="btn2 solid" id="reviewConfirm" type="button">Save on device</button></div>
+    </div>
+  </div>
   <div class="modal" id="settingsModal" hidden>
     <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setTitle">
       <div class="sheet-head">
@@ -612,7 +631,7 @@
           <li><strong>Income</strong>: salary, bonus or other, with an optional source such as your employer. You can enter more than one per pay period.</li>
           <li><strong>Loan pay</strong>: choose the loan; the amount is filled in with the next installment. Leave <strong>Also count it as spending</strong> ticked if the payment should reduce your budget in a category (for example, Loan Payment).</li>
           </ul>
-          <p>Recent entries appear below the form. To remove one, tap <strong>Delete</strong> and then <strong>Sure?</strong>. To fix a mistake, delete the entry and add it again.</p>
+          <p>Recent entries appear below the form. To remove one, tap <strong>Delete</strong> and then <strong>Sure?</strong>. For income and ordinary expenses, tap Edit, change the fields, and review before saving. Fund and loan entries still use the online workflow.</p>
           <h4>Funds</h4>
           <p>Every fund with its balance, progress toward its target, how far you have to go, and whether you are on track against your plan so far. <strong>New fund</strong> starts a fund from here.</p>
           <h4>Loans</h4>
@@ -643,7 +662,7 @@
           <li><strong>&quot;Set up (run once)&quot; message in the app</strong>: run the setup from the sheet&#x27;s Salary Ledger menu, then refresh.</li>
           <li><strong>&quot;Saving is off until you set a PIN&quot;</strong>: use Salary Ledger → Set or change PIN in the sheet.</li>
           <li><strong>&quot;Too many wrong tries&quot;</strong>: wait 10 minutes and try again.</li>
-          <li><strong>A save seemed to fail</strong>: tap Save again. A retry never records the same entry twice.</li>
+          <li><strong>A save seemed to fail</strong>: income and ordinary expenses stay in the pending list and retry safely. For fund or loan saves, refresh and check the sheet before retrying an uncertain save.</li>
           </ul>
         </article>
       </div>
@@ -668,13 +687,13 @@
     if (connection) return connection;
     connection = new Promise(function(resolve, reject){
       if (!root.indexedDB) { reject(new Error('IndexedDB is unavailable.')); return; }
-      var request = root.indexedDB.open('salary-ledger-offline', 1);
+      var request = root.indexedDB.open('salary-ledger-offline', 2);
       request.onupgradeneeded = function(){
         var db = request.result;
-        db.createObjectStore('snapshots', {keyPath:'ledgerId'});
-        db.createObjectStore('metadata');
-        // Reserved for the next increment; no offline writes are accepted yet.
-        db.createObjectStore('outbox', {keyPath:'mutationId'});
+        if(!db.objectStoreNames.contains('snapshots')) db.createObjectStore('snapshots', {keyPath:'ledgerId'});
+        if(!db.objectStoreNames.contains('metadata')) db.createObjectStore('metadata');
+        if(!db.objectStoreNames.contains('outbox')) db.createObjectStore('outbox', {keyPath:'mutationId'});
+        if(!db.objectStoreNames.contains('localAudit')) db.createObjectStore('localAudit', {keyPath:'mutationId'});
       };
       request.onerror = function(){ connection = null; reject(request.error); };
       request.onblocked = function(){ connection = null; reject(new Error('Close other app windows to update local storage.')); };
@@ -705,8 +724,14 @@
     try { validate(snapshot); } catch(e){ return Promise.reject(e); }
     return open().then(function(db){ return new Promise(function(resolve,reject){
       var tx = db.transaction(['snapshots','metadata'], 'readwrite');
-      tx.objectStore('snapshots').put(snapshot);
-      tx.objectStore('metadata').put(snapshot.ledgerId, 'activeLedger');
+      var current=tx.objectStore('snapshots').get(snapshot.ledgerId);
+      current.onsuccess=function(){
+        var previous=current.result;
+        if(previous && ((previous.lastAcknowledgedAt && snapshot.capturedAt < previous.lastAcknowledgedAt) || snapshot.capturedAt < previous.capturedAt)) { tx.abort(); return; }
+        if(previous && previous.lastAcknowledgedAt) snapshot.lastAcknowledgedAt=previous.lastAcknowledgedAt;
+        tx.objectStore('snapshots').put(snapshot);
+        tx.objectStore('metadata').put(snapshot.ledgerId, 'activeLedger');
+      };
       tx.oncomplete = function(){ resolve(snapshot); };
       tx.onabort = tx.onerror = function(){ reject(tx.error || new Error('Local snapshot was not saved.')); };
     }); });
@@ -726,7 +751,78 @@
       tx.onabort = tx.onerror = function(){ reject(tx.error || new Error('Local snapshot could not be read.')); };
     }); });
   }
-  root.LedgerLocal = {save:save, restore:restore, validate:validate};
+  function view(){
+    return open().then(function(db){return new Promise(function(resolve,reject){
+      var tx=db.transaction(['snapshots','metadata','outbox'],'readonly'),snapshot=null,entries=[];
+      var active=tx.objectStore('metadata').get('activeLedger');active.onsuccess=function(){
+        if(!active.result)return;
+        var saved=tx.objectStore('snapshots').get(active.result);saved.onsuccess=function(){snapshot=saved.result||null;};
+        var all=tx.objectStore('outbox').getAll();all.onsuccess=function(){entries=root.LedgerPending.order(all.result.filter(function(e){return e.ledgerId===active.result;}));};
+      };
+      tx.oncomplete=function(){try{resolve({snapshot:snapshot?validate(snapshot):null,entries:entries});}catch(error){reject(error);}};
+      tx.onabort=tx.onerror=function(){reject(tx.error||new Error('Local ledger could not be read.'));};
+    });});
+  }
+  function transact(mode, operation){
+    return open().then(function(db){return new Promise(function(resolve,reject){
+      var tx=db.transaction(['snapshots','outbox','localAudit'],mode), result;
+      tx.oncomplete=function(){resolve(result);};tx.onabort=tx.onerror=function(){reject(tx.error||new Error('Local data could not be committed.'));};
+      operation(tx,function(value){result=value;},function(error){tx.onabort=function(){reject(error);};tx.abort();});
+    });});
+  }
+  function list(ledgerId){return transact('readonly',function(tx,done){var r=tx.objectStore('outbox').getAll();r.onsuccess=function(){done(root.LedgerPending.order(r.result.filter(function(e){return e.ledgerId===ledgerId;})));};});}
+  function enqueue(input,expectedRevision){
+    return transact('readwrite',function(tx,done,fail){
+      var saved=tx.objectStore('snapshots').get(input.ledgerId);
+      saved.onsuccess=function(){
+        var all=tx.objectStore('outbox').getAll();all.onsuccess=function(){try{
+          if(!saved.result)throw new Error('Download a complete ledger first.');
+          var entries=all.result.filter(function(e){return e.ledgerId===input.ledgerId;}), previous=all.result.find(function(e){return e.mutationId===input.mutationId;});
+          if(previous){if(JSON.stringify(previous.payload)!==JSON.stringify(input))throw new Error('Mutation ID was reused.');done(previous);return;}
+          var record=root.LedgerPending.validate(saved.result,entries,input,expectedRevision), siblings=root.LedgerPending.order(entries.filter(function(e){return e.payload.table===input.table&&e.payload.recordId===input.recordId;}));
+          var seq=all.result.reduce(function(n,e){return Math.max(n,e.sequence);},0)+1;
+          var entry={mutationId:input.mutationId,ledgerId:input.ledgerId,payload:root.LedgerPending.clone(input),status:'pending',proposalRecord:record,sequence:seq,createdAt:new Date().toISOString(),dependsOn:siblings.length?siblings[siblings.length-1].mutationId:null,error:''};
+          tx.objectStore('outbox').add(entry);
+          var beforeView=root.LedgerPending.project(saved.result,entries).tables[input.table].find(function(x){return x.record[root.LedgerPending.key(input.table)]===input.recordId;});
+          tx.objectStore('localAudit').add({mutationId:entry.mutationId,ledgerId:entry.ledgerId,status:'confirmed',proposal:entry.payload,before:beforeView?beforeView.record:null,after:record,createdAt:entry.createdAt});done(entry);
+        }catch(error){fail(error);}};
+      };
+    });
+  }
+  function acknowledge(ledgerId,mutationId,receipt){
+    return transact('readwrite',function(tx,done,fail){var get=tx.objectStore('outbox').get(mutationId);get.onsuccess=function(){try{
+      var entry=get.result;if(!entry){done(false);return;}
+      if(entry.ledgerId!==ledgerId||!receipt||receipt.mutationId!==mutationId||receipt.recordId!==entry.payload.recordId||['committed','conflict'].indexOf(receipt.status)<0)throw new Error('Invalid server acknowledgement.');
+      if(receipt.status==='conflict'){
+        entry.status='conflict';entry.error='Cloud record changed. Review before resolving.';entry.conflict=receipt;tx.objectStore('outbox').put(entry);done(true);return;
+      }
+      if(!receipt.record||receipt.record[root.LedgerPending.key(entry.payload.table)]!==entry.payload.recordId||!/^[a-f0-9]{64}$/.test(receipt.fingerprint)||!Number.isFinite(Date.parse(receipt.committedAt)))throw new Error('Invalid committed receipt.');
+      var base=tx.objectStore('snapshots').get(ledgerId);base.onsuccess=function(){try{
+        if(!base.result)throw new Error('The local ledger base is missing.');
+        var snapshot=base.result;
+        if(snapshot.capturedAt<=receipt.committedAt)root.LedgerPending.applyRecord(snapshot,entry.payload.table,receipt.record,receipt.fingerprint);
+        if(!snapshot.lastAcknowledgedAt||snapshot.lastAcknowledgedAt<receipt.committedAt)snapshot.lastAcknowledgedAt=receipt.committedAt;
+        tx.objectStore('snapshots').put(snapshot);
+        var all=tx.objectStore('outbox').getAll();all.onsuccess=function(){
+          all.result.filter(function(e){return e.ledgerId===ledgerId&&e.dependsOn===mutationId;}).forEach(function(e){e.dependsOn=null;e.payload.baseFingerprint=receipt.fingerprint;tx.objectStore('outbox').put(e);});
+          tx.objectStore('outbox').delete(mutationId);
+          var audit=tx.objectStore('localAudit').get(mutationId);audit.onsuccess=function(){var a=audit.result||{mutationId:mutationId,ledgerId:ledgerId,proposal:entry.payload,createdAt:entry.createdAt};a.status='committed';a.receipt=receipt;tx.objectStore('localAudit').put(a);};done(true);
+        };
+      }catch(error){fail(error);}};
+    }catch(error){fail(error);}};});
+  }
+  function failure(ledgerId,mutationId,message){return transact('readwrite',function(tx,done){var get=tx.objectStore('outbox').get(mutationId);get.onsuccess=function(){var e=get.result;if(e&&e.ledgerId===ledgerId&&e.status!=='conflict'){e.error=String(message).slice(0,250);tx.objectStore('outbox').put(e);}done(true);};});}
+  function discardConflict(ledgerId,mutationId){
+    return transact('readwrite',function(tx,done,fail){var all=tx.objectStore('outbox').getAll();all.onsuccess=function(){try{
+      var entry=all.result.find(function(e){return e.ledgerId===ledgerId&&e.mutationId===mutationId;});
+      if(!entry||entry.status!=='conflict')throw new Error('This conflict changed. Refresh the list.');
+      all.result.filter(function(e){return e.ledgerId===ledgerId&&e.payload.table===entry.payload.table&&e.payload.recordId===entry.payload.recordId;}).forEach(function(e){
+        tx.objectStore('outbox').delete(e.mutationId);var audit=tx.objectStore('localAudit').get(e.mutationId);audit.onsuccess=function(){var a=audit.result||{mutationId:e.mutationId,ledgerId:ledgerId,proposal:e.payload,createdAt:e.createdAt};a.status='discarded_after_conflict';a.conflict=entry.conflict;tx.objectStore('localAudit').put(a);};
+      });done(true);
+    }catch(error){fail(error);}};});
+  }
+
+  root.LedgerLocal = {save:save, restore:restore, validate:validate, view:view, list:list, enqueue:enqueue, acknowledge:acknowledge, failure:failure, discardConflict:discardConflict};
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
 
@@ -831,6 +927,95 @@
 </script>
 
 <script>
+/* Local single-record mutations: projections never alter the saved cloud base. */
+(function(root){
+  'use strict';
+  function clone(value){return JSON.parse(JSON.stringify(value));}
+  function key(table){return table==='INCOME'?'income_id':'txn_id';}
+  function same(entry,table,id){return entry.payload.table===table&&entry.payload.recordId===id;}
+  function order(entries){return entries.slice().sort(function(a,b){return a.sequence-b.sequence||a.mutationId.localeCompare(b.mutationId);});}
+  function revision(snapshot,entries,table,id){
+    var found=snapshot.tables[table].find(function(x){return x.record[key(table)]===id;});
+    return (found?found.fingerprint:'new')+'|'+order(entries.filter(function(e){return same(e,table,id);})).map(function(e){return e.mutationId;}).join('|');
+  }
+  function round(n){return Math.round((n+Number.EPSILON)*100)/100;}
+  function applyRecord(snapshot,table,record,fingerprint){
+    var id=record[key(table)], rows=snapshot.tables[table], index=rows.findIndex(function(x){return x.record[key(table)]===id;}), before=index>=0?rows[index].record:null;
+    if(index>=0)rows[index]={record:clone(record),fingerprint:fingerprint};else rows.push({record:clone(record),fingerprint:fingerprint});
+    var d=snapshot.state, isIncome=table==='INCOME';
+    function delta(r,sign){
+      if(!r||r.deleted_at)return;
+      var value=sign*r.amount, p=d.periods.find(function(p){return p.id===r.period_id;});
+      if(isIncome){d.summary.received=round(d.summary.received+value);if(p)p.income=round(p.income+value);}
+      else {
+        if(r.type!=='EXPENSE')throw new Error('Only ordinary expenses are supported.');
+        d.summary.spent=round(d.summary.spent+value);if(p)p.spent=round(p.spent+value);
+        var c=d.categories.find(function(c){return c.id===r.category_id;});if(c)c.actual=round(c.actual+value);
+        var group=d.byCat[r.period_id]||(d.byCat[r.period_id]={});group[r.category_id]=round((group[r.category_id]||0)+value);
+      }
+    }
+    delta(before,-1);delta(record,1);
+    d.summary.saved=round(d.summary.received-d.summary.spent);d.summary.unassigned=round(d.summary.saved-d.summary.inFunds);
+    d.periods.forEach(function(p){p.hasIncome=snapshot.tables.INCOME.some(function(x){return !x.record.deleted_at&&x.record.period_id===p.id;});p.unassigned=p.hasIncome?round(p.income-p.spent-p.funds):0;});
+    d.recent=d.recent.filter(function(r){return !(r.id===id&&r.kind===(isIncome?'income':'txn'));});
+    if(!record.deleted_at){
+      var c=d.categories.find(function(c){return c.id===record.category_id;}), p=d.periods.find(function(p){return p.id===record.period_id;});
+      d.recent.push({kind:isIncome?'income':'txn',id:id,date:isIncome?record.received_date:record.txn_date,at:record.created_at,title:isIncome?(record.source||record.kind):(c?c.name:'Expense'),amount:record.amount,dir:isIncome?'in':'out',sub:[isIncome?'Income · '+record.kind.toLowerCase():'Expense',p?'for '+p.label:'',record.note].filter(Boolean).join(' · ')});
+      d.recent.sort(function(a,b){return (b.at||'').localeCompare(a.at||'')||b.date.localeCompare(a.date);});d.recent=d.recent.slice(0,40);
+    }
+    return snapshot;
+  }
+  function after(snapshot,payload,createdAt){
+    var table=payload.table, found=snapshot.tables[table].find(function(x){return x.record[key(table)]===payload.recordId;}), r=found?clone(found.record):{};
+    r[key(table)]=payload.recordId;if(!found){r.created_at=createdAt;r.deleted_at='';if(table==='TRANSACTIONS')r.type='EXPENSE';}
+    r.updated_at=createdAt;
+    var map=table==='INCOME'?{periodId:'period_id',date:'received_date',kind:'kind',source:'source',note:'note'}:{periodId:'period_id',date:'txn_date',categoryId:'category_id',note:'note'};
+    Object.keys(map).forEach(function(k){if(payload.values[k]!==undefined)r[map[k]]=payload.values[k];});if(payload.values.amountMinor!==undefined)r.amount=payload.values.amountMinor/100;
+    return r;
+  }
+  function project(snapshot,entries){
+    var result=clone(snapshot);
+    var relevant=entries.filter(function(e){return e.ledgerId===snapshot.ledgerId;});
+    order(relevant).forEach(function(e){
+      if(relevant.some(function(other){return other.status==='conflict'&&same(other,e.payload.table,e.payload.recordId);}))return;
+      var existing=result.tables[e.payload.table].find(function(x){return x.record[key(e.payload.table)]===e.payload.recordId;});
+      if(e.payload.operation==='edit'&&(!existing||existing.record.deleted_at||(e.payload.table==='TRANSACTIONS'&&existing.record.type!=='EXPENSE')))return;
+      var record=after(result,e.payload,e.createdAt), item=result.tables[e.payload.table].find(function(x){return x.record[key(e.payload.table)]===e.payload.recordId;});
+      applyRecord(result,e.payload.table,record,item?item.fingerprint:'0'.repeat(64));
+    });
+    return result;
+  }
+  function validate(snapshot,entries,input,expectedRevision){
+    if(!snapshot.capabilities||snapshot.capabilities.recordSyncVersion!==1)throw new Error('Update Apps Script, prepare reliable sync, and refresh online before enabling offline entries.');
+    if(!input||input.version!==1||input.ledgerId!==snapshot.ledgerId||['INCOME','TRANSACTIONS'].indexOf(input.table)<0||['add','edit'].indexOf(input.operation)<0)throw new Error('Unsupported local mutation.');
+    if(Object.keys(input).some(function(k){return ['version','ledgerId','mutationId','operation','table','recordId','baseFingerprint','values'].indexOf(k)<0;}))throw new Error('Unsupported mutation fields.');
+    if(!/^[A-Za-z0-9][A-Za-z0-9_-]{15,79}$/.test(input.mutationId)||typeof input.recordId!=='string'||!new RegExp('^'+(input.table==='INCOME'?'inc_':'txn_')+'[A-Za-z0-9_-]{4,76}$').test(input.recordId))throw new Error('Invalid stable ID.');
+    if(input.operation==='edit'&&(!/^[a-f0-9]{64}$/.test(input.baseFingerprint)||typeof expectedRevision!=='string'))throw new Error('An edit needs an exact local revision.');
+    if(input.operation==='add'&&input.baseFingerprint!==undefined)throw new Error('Additions cannot have a base fingerprint.');
+    if(expectedRevision!==revision(snapshot,entries,input.table,input.recordId))throw new Error('This record changed while you were reviewing it. Reopen and confirm again.');
+    if(entries.some(function(e){return same(e,input.table,input.recordId)&&e.status==='conflict';}))throw new Error('Resolve the conflict before editing this record.');
+    var fields=input.table==='INCOME'?['periodId','date','amountMinor','kind','source','note']:['periodId','date','amountMinor','categoryId','note'], v=input.values;
+    if(!v||typeof v!=='object'||Array.isArray(v)||!Object.keys(v).length||Object.keys(v).some(function(k){return fields.indexOf(k)<0;}))throw new Error('Invalid mutation values.');
+    if(input.operation==='add'&&fields.some(function(k){return v[k]===undefined;}))throw new Error('Complete all entry fields.');
+    if(v.amountMinor!==undefined&&(!Number.isSafeInteger(v.amountMinor)||v.amountMinor<=0||v.amountMinor>1000000000))throw new Error('Enter an amount above zero with at most two decimals.');
+    if(v.date!==undefined){var date=typeof v.date==='string'?new Date(v.date+'T00:00:00Z'):new Date(NaN);if(!/^\d{4}-\d{2}-\d{2}$/.test(v.date)||isNaN(date)||date.getUTCFullYear()<2000||date.getUTCFullYear()>2100||date.toISOString().slice(0,10)!==v.date)throw new Error('Enter a valid calendar date.');}
+    ['note','source'].forEach(function(k){if(v[k]!==undefined&&(typeof v[k]!=='string'||v[k].length>(k==='note'?200:60)||/^[=+@-]/.test(v[k].trim())||/[\u0000-\u001f\u007f]/.test(v[k])))throw new Error('Invalid '+k+'; avoid formula markers and control characters.');});
+    if(v.kind!==undefined&&['SALARY','BONUS','OTHER'].indexOf(v.kind)<0)throw new Error('Invalid income type.');
+    var projected=project(snapshot,entries), current=projected.tables[input.table].find(function(x){return x.record[key(input.table)]===input.recordId;});
+    if(input.operation==='add'&&current)throw new Error('This record ID already exists.');
+    if(input.operation==='edit'&&(!current||current.record.deleted_at))throw new Error('This record is no longer available.');
+    if(input.operation==='edit'&&current.fingerprint!==input.baseFingerprint)throw new Error('This record changed. Reopen the edit and review again.');
+    if(input.table==='TRANSACTIONS'&&((current&&current.record.type!=='EXPENSE')||projected.tables.LOAN_PAYMENTS.some(function(x){return x.record.txn_id===input.recordId;})))throw new Error('Loan and fund records use the online workflow.');
+    var record=after(projected,input,new Date().toISOString());
+    if(!projected.tables.PAY_PERIODS.some(function(x){return !x.record.deleted_at&&x.record.period_id===record.period_id;}))throw new Error('Choose an available pay period.');
+    if(input.table==='TRANSACTIONS'&&!projected.tables.CATEGORIES.some(function(x){var c=x.record;return !c.deleted_at&&!c.is_archived&&c.kind==='SPENDING'&&c.category_id===record.category_id;}))throw new Error('Choose an active spending category.');
+    return record;
+  }
+  root.LedgerPending={project:project,validate:validate,revision:revision,applyRecord:applyRecord,order:order,key:key,clone:clone};
+})(typeof window!=='undefined'?window:globalThis);
+</script>
+
+<script>
 (function(){
   'use strict';
 
@@ -855,6 +1040,7 @@
 
   var TITLES = { home:'Overview', plan:'Plan', add:'Add record', funds:'Funds', loans:'Loans' };
   var data = null, busy = false, saving = false, ledgerSnapshot = null, snapshotStale = false;
+  var cloudSnapshot=null, pendingEntries=[], syncing=false, syncPromise=null, editDraft=null, syncRequested=false;
   var localStatus = 'No complete local snapshot yet.';
   function setLocalStatus(message){
     localStatus = message;
@@ -869,8 +1055,12 @@
   function call(fn){
     var args = Array.prototype.slice.call(arguments, 1);
     return new Promise(function(resolve, reject){
-      var r = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
-      r[fn].apply(r, args);
+      var timer=setTimeout(function(){reject(new Error('Connection timed out. Pending changes are preserved.'));},25000);
+      function finish(callback,value){clearTimeout(timer);callback(value);}
+      try {
+        var r = google.script.run.withSuccessHandler(function(value){finish(resolve,value);}).withFailureHandler(function(error){finish(reject,error);});
+        r[fn].apply(r, args);
+      } catch(error){finish(reject,error);}
     });
   }
   function cidFor(k){ if (!cids[k]) cids[k] = uid(); return cids[k]; }
@@ -888,15 +1078,17 @@
     if (/PIN_NOT_SET/.test(m)) return 'Saving is off until you set a PIN: in your sheet, open Salary Ledger → Set or change PIN.';
     if (/NOT_SETUP/.test(m)) return 'In your sheet, open Salary Ledger → Set up (run once).';
     if (/BUSY/.test(m)) return 'Another save is still running. Try again in a moment.';
-    return 'Couldn’t save. Check your connection and tap again. It won’t double-record.';
+    return 'Couldn’t confirm the save. Refresh and check your records before retrying.';
   }
   function applyState(s){
     data = s; hideBanner(); hideLock(); render();
   }
   /* one write: done(result|null, errorText) */
   function mutate(fn, args, done){
-    if (saving) return; saving = true;
-    call.apply(null, [fn, pin].concat(args)).then(function(res){ applyState(res.state); snapshotStale = true; setLocalStatus('Cloud save completed. Refresh to update the full local snapshot.'); return { res: res }; },
+    if (saving) return;
+    if(pendingEntries.length){var message='Synchronize pending changes before using this online-only action.';if(done)done(null,message);else toast(message,true);return;}
+    saving = true;
+    call.apply(null, [fn, pin].concat(args)).then(function(res){ applyState(res.state); snapshotStale = true; setLocalStatus('Cloud save completed. Refreshing the full local snapshot.'); setTimeout(load,0); return { res: res }; },
       function(err){ return { err: errText(err) }; })
     .then(function(o){ saving = false; if (done) done(o.res || null, o.err || ''); })
     .catch(function(e){ saving = false; if (window.console) console.error(e); toast('Something went wrong showing the result. Pull to refresh.', true); });
@@ -920,6 +1112,7 @@
     return '<button type="button" class="del' + (on ? ' armed' : '') + '" data-act="del" data-kind="' + kind + '" data-id="' + esc(id) + '" aria-label="Delete ' + esc(label) + '">' + (on ? 'Sure?' : 'Delete') + '</button>';
   }
   function onDelete(kind, id){
+    if(pendingEntries.some(function(e){return e.payload.recordId===id;})){toast('Synchronize or resolve this record before deleting it.',true);return;}
     var key = kind + ':' + id;
     if (armed !== key) {
       armed = key; clearTimeout(armTimer);
@@ -1006,7 +1199,7 @@
     if(!ledgerSnapshot){ el.textContent = offline ? 'Device offline · Connect and refresh to download your ledger.' : 'Refresh to download your ledger before asking a question.'; return; }
     var date = new Date(ledgerSnapshot.capturedAt);
     var stamp = new Intl.DateTimeFormat('en', {timeZone:ledgerSnapshot.timezone,month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(date);
-    el.textContent = (offline ? 'Device offline · ' : '') + (snapshotStale ? 'New changes available · Refresh for current answers.' : 'Saved records · Updated ' + stamp);
+    el.textContent = (offline ? 'Device offline · ' : '') + (pendingEntries.length ? pendingEntries.length+' pending · '+(pendingEntries.some(function(e){return e.status==='conflict';})?'Conflicts use cloud values · ':'Includes local changes · ') : '') + (snapshotStale ? 'New changes available · Refresh for current answers.' : 'Saved records · Updated ' + stamp);
   }
   function askLedger(text){
     $('.ledger-assistant').classList.add('is-expanded');
@@ -1055,7 +1248,7 @@
       } else {
         paragraph(money(r.totalMinor), 'assistant-value'); paragraph('Across ' + r.count + ' ' + (r.kind === 'income' ? 'income' : 'expense') + (r.count === 1 ? ' entry.' : ' entries.'));
       }
-      paragraph((snapshotStale ? 'Refresh to include your latest changes. ' : '') + 'From the ledger saved ' + new Intl.DateTimeFormat('en',{timeZone:ledgerSnapshot.timezone,month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(ledgerSnapshot.capturedAt)) + '.', 'assistant-answer-source');
+      paragraph((snapshotStale ? 'Refresh to include your latest changes. ' : '') + (pendingEntries.length ? 'Includes non-conflicting pending changes. ' : '') + 'From the ledger saved ' + new Intl.DateTimeFormat('en',{timeZone:ledgerSnapshot.timezone,month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(ledgerSnapshot.capturedAt)) + '.', 'assistant-answer-source');
     } catch(e){ answer.classList.add('is-error'); paragraph('Let’s try a different question', 'assistant-empty'); paragraph(e.message); }
     history.scrollTop = history.scrollHeight;
   }
@@ -1162,6 +1355,134 @@
     });
   }
 
+  function newLocalId(prefix){
+    var bytes=new Uint8Array(16);crypto.getRandomValues(bytes);
+    return prefix+Array.prototype.map.call(bytes,function(n){return ('0'+n.toString(16)).slice(-2);}).join('');
+  }
+  function refreshLocal(){
+    return LedgerLocal.view().then(function(view){
+      if(!view.snapshot)return;
+      cloudSnapshot=view.snapshot;pendingEntries=view.entries;ledgerSnapshot=LedgerPending.project(cloudSnapshot,pendingEntries);
+      data=ledgerSnapshot.state;
+      data.today=LedgerQuery.bounds('today',ledgerSnapshot.timezone)[0];
+      var eligible=data.periods.filter(function(p){return p.date<=data.today;}).sort(function(a,b){return a.date.localeCompare(b.date);});
+      if(eligible.length)data.currentPeriodId=eligible[eligible.length-1].id;
+      data.periods.forEach(function(p){p.isCurrent=p.id===data.currentPeriodId;});
+      render();renderPending();updateAssistantSource();
+    });
+  }
+  function renderPending(){
+    var panel=$('#pendingPanel'), body=$('#pendingBody'), summary=$('#pendingSummary');
+    panel.hidden=!pendingEntries.length;
+    summary.textContent=pendingEntries.length+' pending change'+(pendingEntries.length===1?'':'s')+(syncing?' · Synchronizing…':'');
+    body.textContent='';
+    pendingEntries.forEach(function(entry){
+      var row=document.createElement('div');row.className='pending-item';
+      var title=document.createElement('p');title.className='row-name';title.textContent=(entry.payload.operation==='add'?'New ':'Edited ')+(entry.payload.table==='INCOME'?'income':'expense')+' · '+entry.payload.recordId;
+      var note=document.createElement('p');note.className='sub';note.textContent=entry.status==='conflict'?'Cloud record changed. Your proposal is preserved.':entry.dependsOn?'Waiting for an earlier change to this record.':entry.error||'Saved on this device. Waiting to synchronize.';
+      row.appendChild(title);row.appendChild(note);
+      if(entry.status==='conflict'){
+        var values=document.createElement('p');values.className='sub';
+        var proposals=LedgerPending.order(pendingEntries.filter(function(e){return e.payload.table===entry.payload.table&&e.payload.recordId===entry.payload.recordId;}));
+        var proposed=proposals.length?proposals[proposals.length-1].proposalRecord:null;
+        values.textContent='Your amount: '+(proposed?ledgerSnapshot.currency+nf.format(proposed.amount):'unavailable')+' · Cloud amount: '+(entry.conflict.remote?ledgerSnapshot.currency+nf.format(entry.conflict.remote.amount):'record missing');
+        var button=document.createElement('button');button.type='button';button.className='btn2';button.dataset.act='resolvecloud';button.dataset.id=entry.mutationId;button.textContent='Review cloud version';row.appendChild(values);row.appendChild(button);
+      }
+      body.appendChild(row);
+    });
+    if(pendingEntries.length){var retry=document.createElement('button');retry.type='button';retry.className='btn2';retry.dataset.act='retrysync';retry.textContent=syncing?'Synchronizing…':'Retry sync';retry.disabled=syncing;body.appendChild(retry);}
+    var status=$('#localStatus');if(status&&pendingEntries.length)status.textContent=pendingEntries.length+' change(s) saved on this device. Open Home to review synchronization.';
+  }
+  function drainQueue(){
+    if(syncPromise)return syncPromise;
+    if(!cloudSnapshot||navigator.onLine===false)return Promise.resolve();
+    var ledgerId=cloudSnapshot.ledgerId;syncing=true;renderPending();
+    syncPromise=(async function(){
+      for(var n=0;n<100;n++){
+        var all=await LedgerLocal.list(ledgerId), next=all.find(function(e){return e.status==='pending'&&!e.dependsOn;});
+        if(!next)break;
+        try{
+          var receipt=await call('syncLedgerMutation',pin,next.payload);
+          await LedgerLocal.acknowledge(ledgerId,next.mutationId,receipt);
+        }catch(error){
+          var message=String(error&&error.message||error);
+          await LedgerLocal.failure(ledgerId,next.mutationId,/SYNC_NOT_PREPARED/.test(message)?'Prepare reliable sync in the Sheet, redeploy, and retry.':/SYNC_WRONG_LEDGER/.test(message)?'Wrong spreadsheet deployment. Pending change is preserved.':/BAD_PIN|PIN_REQUIRED|LOCKED/.test(message)?'Unlock online with a valid PIN, then retry.':message);
+          if(/BAD_PIN|PIN_REQUIRED|LOCKED/.test(message)){errText(error);}
+          break;
+        }
+      }
+    })().finally(function(){syncing=false;syncPromise=null;return refreshLocal();});
+    return syncPromise;
+  }
+  var reviewResolver=null,reviewFocus=null;
+  function recordDescription(record,table){
+    if(!record)return 'No existing record';
+    var income=table==='INCOME',cat=ledgerSnapshot.tables.CATEGORIES.find(function(x){return x.record.category_id===record.category_id;}),p=byId(data.periods,record.period_id);
+    return ['Amount: '+ledgerSnapshot.currency+nf.format(record.amount),'Date: '+(income?record.received_date:record.txn_date),'Pay period: '+(p?p.label:record.period_id),income?'Income type: '+record.kind:'Category: '+(cat?cat.record.name:record.category_id),income?'Source: '+(record.source||'None'):'', 'Note: '+(record.note||'None')].filter(Boolean).join('\n');
+  }
+  function reviewChange(title,before,after,confirmLabel){
+    if(reviewResolver)return Promise.resolve(false);
+    $('#reviewTitle').textContent=title;$('#reviewBefore').textContent=before;$('#reviewAfter').textContent=after;$('#reviewConfirm').textContent=confirmLabel||'Save on device';
+    reviewFocus=document.activeElement;$('#entryReview').hidden=false;$('#reviewCancel').focus();
+    return new Promise(function(resolve){reviewResolver=resolve;});
+  }
+  function closeReview(confirmed){
+    if(!reviewResolver)return;var resolve=reviewResolver;reviewResolver=null;$('#entryReview').hidden=true;
+    if(reviewFocus&&reviewFocus.isConnected)reviewFocus.focus();resolve(confirmed);
+  }
+  function cancelEdit(){
+    editDraft=null;delete cids.add;$('#fAmount').value='';$('#fNote').value='';fillAdd();setMsg('addMsg','');
+  }
+  function editEntry(table,id){
+    if(!cloudSnapshot)return;
+    var item=ledgerSnapshot.tables[table].find(function(x){return x.record[LedgerPending.key(table)]===id;});
+    if(!item||item.record.deleted_at)return toast('This record is no longer available.',true);
+    if(pendingEntries.some(function(e){return e.payload.recordId===id&&e.status==='conflict';}))return toast('Resolve this record’s cloud conflict on Home before editing.',true);
+    if(table==='TRANSACTIONS'&&(item.record.type!=='EXPENSE'||ledgerSnapshot.tables.LOAN_PAYMENTS.some(function(x){return x.record.txn_id===id;})))return toast('Loan and fund entries use the online workflow.',true);
+    editDraft={table:table,id:id,baseFingerprint:item.fingerprint,revision:LedgerPending.revision(cloudSnapshot,pendingEntries,table,id),before:LedgerPending.clone(item.record)};
+    addType=table==='INCOME'?'Income':'Expense';fillAdd();showTab('add');
+    var r=item.record;$('#fAmount').value=nf.format(r.amount);$('#fDate').value=table==='INCOME'?r.received_date:r.txn_date;$('#fPeriod').value=r.period_id;$('#fNote').value=r.note||'';
+    if(table==='INCOME'){$('#fKind').value=r.kind;$('#fSource').value=r.source||'';}else $('#fCat').value=r.category_id;
+    setMsg('addMsg','Editing '+id+'. Changes will be reviewed before saving.');
+  }
+  async function submitLocal(t,rec){
+    if(!cloudSnapshot)throw new Error('Refresh online once before creating offline entries.');
+    if(!pin){showLock('Unlock before saving an entry.');return false;}
+    var text=$('#fAmount').value.replace(/[,\s₱]/g,'');
+    var minor=LedgerQuery.cents(text),table=t==='Income'?'INCOME':'TRANSACTIONS';
+    var clean=function(v){return v.replace(/\s+/g,' ').trim();};
+    var values={periodId:rec.periodId,date:rec.date,amountMinor:minor,note:clean(rec.note)};
+    if(t==='Income'){values.kind=rec.kind;values.source=clean(rec.source);}else values.categoryId=rec.categoryId;
+    var id=editDraft?editDraft.id:newLocalId(t==='Income'?'inc_':'txn_');
+    var payload={version:1,ledgerId:cloudSnapshot.ledgerId,mutationId:newLocalId('req_'),operation:editDraft?'edit':'add',table:table,recordId:id,values:values};
+    var revision=editDraft?editDraft.revision:LedgerPending.revision(cloudSnapshot,pendingEntries,table,id);
+    if(editDraft)payload.baseFingerprint=editDraft.baseFingerprint;
+    var after=LedgerPending.validate(cloudSnapshot,pendingEntries,payload,revision);
+    if(!await reviewChange(editDraft?'Review entry changes':'Review new '+t.toLowerCase(),editDraft?recordDescription(editDraft.before,table):'New record · '+id,recordDescription(after,table)))return false;
+    await LedgerLocal.enqueue(payload,revision);
+    editDraft=null;delete cids.add;await refreshLocal();
+    $('#fAmount').value='';$('#fNote').value='';fillAdd();setMsg('addMsg','Saved on this device. It will synchronize when connected.','ok');
+    syncRequested=true;load();return true;
+  }
+  async function resolveCloud(id){
+    var entry=pendingEntries.find(function(e){return e.mutationId===id;});if(!entry||entry.status!=='conflict')return;
+    var proposals=LedgerPending.order(pendingEntries.filter(function(e){return e.payload.table===entry.payload.table&&e.payload.recordId===entry.payload.recordId;}));
+    var projected=proposals.length?proposals[proposals.length-1].proposalRecord:null;
+    if(!await reviewChange('Use the cloud version?',recordDescription(projected,entry.payload.table),recordDescription(entry.conflict.remote,entry.payload.table)+'\n\nThis discards all pending changes to this record. A local audit copy is retained.','Use cloud version'))return;
+    try{
+      // Fetch before discarding: a failed refresh must not remove the local proposal.
+      var snapshot=await call('getLedgerSnapshot',pin);LedgerLocal.validate(snapshot);
+      if(snapshot.ledgerId!==entry.ledgerId)throw new Error('Wrong spreadsheet deployment.');
+      var remote=snapshot.tables[entry.payload.table].find(function(x){return x.record[LedgerPending.key(entry.payload.table)]===entry.payload.recordId;});
+      if((remote?remote.fingerprint:null)!==entry.conflict.fingerprint){
+        await LedgerLocal.save(snapshot);
+        await LedgerLocal.acknowledge(entry.ledgerId,id,{status:'conflict',mutationId:id,recordId:entry.payload.recordId,remote:remote?remote.record:null,fingerprint:remote?remote.fingerprint:null});
+        await refreshLocal();throw new Error('The cloud record changed again. Open its review once more to see the latest version.');
+      }
+      await LedgerLocal.save(snapshot);await LedgerLocal.discardConflict(entry.ledgerId,id);await refreshLocal();toast('Cloud version kept.');
+    }catch(error){toast('Could not resolve: '+error.message,true);}
+  }
+
   /* ---------- Add ---------- */
   function ensureAdd(){
     if ($('#addForm')) return;
@@ -1184,7 +1505,7 @@
         '<label class="fld"><span class="label">Date</span><input id="fDate" type="date"></label>' +
         '<label class="fld"><span class="label">Note (optional)</span><input id="fNote" type="text" maxlength="200" placeholder="e.g. Meralco, groceries"></label>' +
         '<p class="form-msg" id="addMsg" role="alert" aria-live="polite"></p>' +
-        '<button class="go" id="addGo" type="submit">Save entry</button>' +
+        '<button class="go" id="addGo" type="submit">Review entry</button><button class="btn2" id="cancelEditBtn" type="button" data-act="canceledit" hidden>Cancel edit</button>' +
       '</form><div class="card" id="recent"></div>';
   }
   function show(id, on){ var el = $('#' + id); if (el) el.hidden = !on; }
@@ -1210,7 +1531,10 @@
       if (!loansOpen.length) need = 'No loan to pay. Add one in the Loans tab.';
     }
     var nb = $('#addNeed'); nb.hidden = !need; nb.textContent = need;
-    $('#addGo').disabled = !!need;
+    $('#addGo').disabled = !!need || saving;
+    $('#addGo').textContent = editDraft ? 'Review changes' : (t==='Expense'||t==='Income'?'Review entry':'Save entry');
+    $('#cancelEditBtn').hidden = !editDraft;
+    $$('#addForm .seg-btn').forEach(function(b){b.disabled=!!editDraft || saving;});
     var hint = $('#fHint'), amt = $('#fAmount');
     hint.hidden = true;
     if (t === 'Loan' && !need) {
@@ -1225,8 +1549,13 @@
   }
   function renderRecent(){
     var d = data, rows = d.recent.map(function(t){
+      var table=t.kind==='income'?'INCOME':t.kind==='txn'?'TRANSACTIONS':null;
+      var item=table&&ledgerSnapshot?ledgerSnapshot.tables[table].find(function(x){return x.record[LedgerPending.key(table)]===t.id;}):null;
+      var editable=item&&(table==='INCOME'||(item.record.type==='EXPENSE'&&!ledgerSnapshot.tables.LOAN_PAYMENTS.some(function(x){return x.record.txn_id===t.id;})));
+      var pending=pendingEntries.some(function(e){return e.payload.recordId===t.id;});
+      var actions='<div class="rec-actions">'+(pending?'<span class="pending-tag">Pending sync</span>':'')+(editable?'<button class="btn2" type="button" data-act="editentry" data-table="'+table+'" data-id="'+esc(t.id)+'">Edit</button>':'')+(!pending?delBtn(t.kind,t.id,t.title+' '+peso(t.amount)):'')+'</div>';
       return '<div class="rec"><p class="rec-name">' + esc(t.title) + '</p><p class="rec-amt' + (t.dir === 'in' ? ' in' : '') + '">' + (t.dir === 'in' ? '+' : '') + peso(t.amount) + '</p>' +
-        '<p class="rec-sub">' + esc(fmtDate(t.date) + ' · ' + t.sub) + '</p>' + delBtn(t.kind, t.id, t.title + ' ' + peso(t.amount)) + '</div>';
+        '<p class="rec-sub">' + esc(fmtDate(t.date) + ' · ' + t.sub) + '</p>' + actions + '</div>';
     }).join('');
     $('#recent').innerHTML = '<p class="label">Recent entries</p>' + (rows || '<p class="sub">Nothing yet. Your first entry will show up here.</p>');
   }
@@ -1240,6 +1569,11 @@
     else if (t === 'Fund') { fn = 'addTransaction'; rec = Object.assign(base, { type: $('#fDir').value === 'OUT' ? 'FUND_OUT' : 'FUND_IN', categoryId: $('#fCat').value }); label = (byId(data.categories, rec.categoryId) || {}).name; }
     else if (t === 'Income') { fn = 'addIncome'; rec = Object.assign(base, { kind: $('#fKind').value, source: $('#fSource').value }); label = $('#fSource').value.trim() || 'Income'; }
     else { fn = 'addLoanPayment'; rec = Object.assign(base, { loanId: $('#fLoan').value, alsoSpend: !$('#wAlso').hidden && $('#fAlso').checked, categoryId: $('#fCat').value }); label = (byId(data.loans, rec.loanId) || {}).name; }
+    if(t==='Expense'||t==='Income'){
+      saving=true;$('#addGo').disabled=true;
+      submitLocal(t,rec).catch(function(error){setMsg('addMsg',error.message,'err');}).finally(function(){saving=false;fillAdd();});return;
+    }
+    if(navigator.onLine===false){setMsg('addMsg','Fund and loan payments currently require an internet connection.','err');return;}
     var go = $('#addGo'); go.disabled = true; go.textContent = 'Saving…';
     mutate(fn, [rec], function(res, err){
       var g = $('#addGo'); if (g) { g.disabled = false; g.textContent = 'Save entry'; }
@@ -1370,28 +1704,30 @@
   function hideLock(){ $('#lock').hidden = true; }
   function load(){
     if (busy) return Promise.resolve();
-    busy = true; $('#refresh').classList.add('spin');
-    setLocalStatus('Refreshing complete ledger…');
-    return call('getLedgerSnapshot', pin).then(function(snapshot){
+    busy = true; syncRequested=false; $('#refresh').classList.add('spin');
+    setLocalStatus('Synchronizing saved changes and refreshing ledger…');
+    return drainQueue().then(function(){
+      if(navigator.onLine===false)throw new Error('Device is offline.');
+      return call('getLedgerSnapshot', pin);
+    }).then(function(snapshot){
       LedgerLocal.validate(snapshot);
-      ledgerSnapshot = snapshot; snapshotStale = false;
-      applyState(snapshot.state);
       return LedgerLocal.save(snapshot).then(function(){
-        store.del('sl2_cache');
-        setLocalStatus('Full ledger cached · ' + snapshot.capturedAt + '. Offline writes are not enabled yet.');
-      }, function(){
-        setLocalStatus('Cloud data loaded, but local storage failed. This data is not saved for offline use.');
-        showBanner('Could not save the local ledger. Check available storage and refresh.');
+        snapshotStale=false;store.del('sl2_cache');
+        return refreshLocal().then(function(){
+          setLocalStatus(snapshot.capabilities&&snapshot.capabilities.recordSyncVersion===1?'Income and ordinary expense entries can be saved on this device, then synchronized. Fund and loan payments still require internet.':'Full ledger cached. Prepare reliable sync and refresh to enable offline entries.');
+          hideBanner();hideLock();renderPending();
+        });
       });
     }).catch(function(err){
-      setLocalStatus('Refresh failed. Any cached data may be out of date; offline writes are not enabled yet.');
+      setLocalStatus('Refresh failed. Saved records and queued changes are preserved.');
       var m = String((err && err.message) || err);
       if (/BAD_PIN/.test(m)) { pin = ''; store.del('sl2_pin'); showLock('That PIN isn’t right.'); }
       else if (/PIN_REQUIRED/.test(m)) showLock('');
       else if (/LOCKED/.test(m)) showLock('Too many wrong tries. Wait 10 minutes, then try again.');
       else if (/PIN_NOT_SET/.test(m)) showBanner('Set a PIN in the sheet before downloading a complete local ledger.');
-      else showBanner(data ? 'Couldn’t refresh. Showing the last data you loaded.' : 'Couldn’t load your sheet. ' + m);
-    }).then(function(){ busy = false; $('#refresh').classList.remove('spin'); });
+      else showBanner(data ? 'Could not refresh. Showing saved records, including pending local changes.' : 'Could not load your sheet. ' + m);
+      renderPending();
+    }).finally(function(){busy=false;$('#refresh').classList.remove('spin');if(syncRequested){syncRequested=false;setTimeout(load,0);}});
   }
 
   /* ---------- events ---------- */
@@ -1402,7 +1738,11 @@
     if (!t) return;
     if (t.hasAttribute('data-tab')) { showTab(t.getAttribute('data-tab')); return; }
     var act = t.getAttribute('data-act'), id = t.getAttribute('data-id');
-    if (act === 'collapseassistant') { var assistant = $('.ledger-assistant'); assistant.classList.remove('is-expanded'); assistant.focus({preventScroll:true}); }
+    if(act==='editentry')editEntry(t.getAttribute('data-table'),id);
+    else if(act==='canceledit')cancelEdit();
+    else if(act==='retrysync')load();
+    else if(act==='resolvecloud')resolveCloud(id);
+    else if (act === 'collapseassistant') { var assistant = $('.ledger-assistant'); assistant.classList.remove('is-expanded'); assistant.focus({preventScroll:true}); }
     else if (act === 'clearchat') { $('#chatHistory').textContent = ''; $('#chatHeading').hidden = true; $('#assistantInput').focus(); }
     else if (act === 'opensettings') openSettings();
     else if (act === 'closesettings') closeSettings();
@@ -1444,8 +1784,16 @@
       mutate('generatePeriods', [y], function(res, err){ toast(err || 'Pay periods for ' + y + ' are ready.', !!err); });
     }
   });
-  window.addEventListener('online', updateAssistantSource);
+  window.addEventListener('online', function(){updateAssistantSource();load();});
   window.addEventListener('offline', updateAssistantSource);
+  $('#reviewCancel').addEventListener('click',function(){closeReview(false);});
+  $('#reviewConfirm').addEventListener('click',function(){closeReview(true);});
+  $('#entryReview').addEventListener('click',function(e){if(e.target===this)closeReview(false);});
+  document.addEventListener('keydown',function(e){
+    if(!reviewResolver)return;
+    if(e.key==='Escape'){e.preventDefault();closeReview(false);}
+    if(e.key==='Tab'){var first=$('#reviewCancel'),last=$('#reviewConfirm');if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}
+  });
   $('#assistantInput').addEventListener('focus', function(){ $('.ledger-assistant').classList.add('is-expanded'); });
   $('#assistantForm').addEventListener('submit', function(e){ e.preventDefault(); var input = $('#assistantInput'); var text = input.value.trim(); if(text){askLedger(text); input.value = ''; input.focus();} });
   $('#refresh').addEventListener('click', load);
@@ -1478,13 +1826,8 @@
   /* ---------- boot ---------- */
   render();
   showTab(tab, true);
-  LedgerLocal.restore().then(function(snapshot){
-    if (snapshot) {
-      ledgerSnapshot = snapshot; data = snapshot.state; render();
-      setLocalStatus('Showing cached ledger from ' + snapshot.capturedAt + '.');
-    }
-  }).catch(function(){
-    setLocalStatus('Local storage is unavailable. Cloud access still requires connectivity.');
+  refreshLocal().catch(function(){
+    setLocalStatus('Local storage is unavailable. Offline saving is disabled.');
   }).then(load);
 
 })();

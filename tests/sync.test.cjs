@@ -18,7 +18,7 @@ function environment(){
    setNumberFormats(){return this;},setNumberFormat(){return this;}
   };}
  }
- const ss={getSheetByName:n=>sheets[n]||null,insertSheet:n=>(sheets[n]=new Sheet(n)),getSpreadsheetTimeZone:()=> 'Asia/Manila'};
+ const ss={getSheetByName:n=>sheets[n]||null,insertSheet:n=>(sheets[n]=new Sheet(n)),getSpreadsheetTimeZone:()=> 'Asia/Manila',getId:()=> 'test-ledger'};
  const ctx=vm.createContext({console});
  ctx.SpreadsheetApp={getActiveSpreadsheet:()=>ss,getUi:()=>({alert(){}}),flush(){flushCount++;if(flushCount===failAt)throw Error('SIMULATED_CRASH');}};
  ctx.PropertiesService={getScriptProperties:()=>({getProperty:()=> '123456'})};
@@ -32,7 +32,7 @@ function environment(){
  for(const table of ['TRANSACTIONS','INCOME','LOAN_PAYMENTS'])sheets[table]=new Sheet(table,[Array.from(ctx.colsOf_(table))]);
  return {ctx,sheets,put,prepare:()=>ctx.prepareReliableSync_(),run:r=>ctx.syncLedgerMutation('123456',r),crashAt:n=>{flushCount=0;failAt=n;},reset:()=>{flushCount=0;failAt=0;}};
 }
-const addition=(extra={})=>({version:1,mutationId:'request_00000000001',operation:'add',table:'TRANSACTIONS',recordId:'txn_client_00000001',values:{periodId:'per_test',date:'2026-10-21',amountMinor:12345,categoryId:'cat_food',note:'Lunch'},...extra});
+const addition=(extra={})=>({version:1,ledgerId:'test-ledger',mutationId:'request_00000000001',operation:'add',table:'TRANSACTIONS',recordId:'txn_client_00000001',values:{periodId:'per_test',date:'2026-10-21',amountMinor:12345,categoryId:'cat_food',note:'Lunch'},...extra});
 function edit(receipt,extra={}){return addition({mutationId:'request_00000000002',operation:'edit',baseFingerprint:receipt.fingerprint,values:{amountMinor:5000},...extra});}
 test('requires valid PIN, explicit preparation and exact journal schema',()=>{
  const e=environment();assert.throws(()=>e.run(addition()),/SYNC_NOT_PREPARED/);
@@ -88,4 +88,8 @@ test('income additions and edits preserve kind and source; stable-ID collision n
  const changed=e.run(edit(r,{table:'INCOME',recordId:r.recordId}));assert.equal(changed.record.amount,50);assert.equal(changed.record.kind,'SALARY');
  assert.equal(e.run(addition({mutationId:'request_00000000003',table:'INCOME',recordId:r.recordId,values:{periodId:'per_test',date:'2026-10-21',amountMinor:1,kind:'OTHER',source:'',note:''}})).status,'conflict');
  assert.equal(e.sheets.INCOME.rows.length,2);
+});
+
+test('a valid PIN cannot send a mutation to the wrong ledger',()=>{
+ const e=environment();e.prepare();assert.throws(()=>e.run(addition({ledgerId:'different-sheet'})),/SYNC_WRONG_LEDGER/);assert.equal(e.sheets.TRANSACTIONS.rows.length,1);
 });

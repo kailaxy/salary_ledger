@@ -1,6 +1,12 @@
 {
   "name": "salary-ledger-tests",
   "private": true,
-  "scripts": { "test": "node --test *.test.cjs" },
-  "devDependencies": { "fake-indexeddb": "6.2.4" }
+  "scripts": {
+    "test": "node --test *.test.cjs",
+    "test:browser": "node browser/offline.cjs"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "6.2.4",
+    "playwright-core": "1.62.1"
+  }
 }

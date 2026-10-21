@@ -22,3 +22,8 @@ jobs:
         working-directory: tests
       - run: npm test
         working-directory: tests
+      - name: Browser offline workflow checks
+        run: npm run test:browser
+        working-directory: tests
+        env:
+          CHROMIUM_PATH: /usr/bin/google-chrome

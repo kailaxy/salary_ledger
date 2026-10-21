@@ -47,7 +47,8 @@ function syncText_(value, max, required, name) {
   return text;
 }
 function syncValidate_(request) {
-  syncFields_(request, ['version', 'mutationId', 'operation', 'table', 'recordId', 'baseFingerprint', 'values']);
+  syncFields_(request, ['version', 'ledgerId', 'mutationId', 'operation', 'table', 'recordId', 'baseFingerprint', 'values']);
+  if (typeof request.ledgerId !== 'string' || !request.ledgerId || request.ledgerId.length > 200) fail_('Invalid ledger identity.');
   if (request.version !== 1 || ['add', 'edit'].indexOf(request.operation) < 0 ||
       ['INCOME', 'TRANSACTIONS'].indexOf(request.table) < 0) fail_('Unsupported sync action.');
   if (typeof request.mutationId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{15,79}$/.test(request.mutationId)) fail_('Invalid mutation ID.');
@@ -71,7 +72,7 @@ function syncValidate_(request) {
   if (values.note !== undefined) syncText_(values.note, 200, false, 'Note');
   if (values.source !== undefined) syncText_(values.source, 60, false, 'Source');
   // Stable serialization also rejects key re-use with different payloads after a lost response.
-  const canonical = { version: 1, mutationId: request.mutationId, operation: request.operation, table: request.table, recordId: request.recordId };
+  const canonical = { version: 1, ledgerId: request.ledgerId, mutationId: request.mutationId, operation: request.operation, table: request.table, recordId: request.recordId };
   if (request.baseFingerprint !== undefined) canonical.baseFingerprint = request.baseFingerprint;
   canonical.values = {};
   fields.forEach(k => { if (values[k] !== undefined) canonical.values[k] = values[k]; });
@@ -116,6 +117,7 @@ function syncLedgerMutation(pin, input) {
   const request = syncValidate_(input), requestJson = JSON.stringify(request);
   return withLock_(function () {
     const ss = SpreadsheetApp.getActiveSpreadsheet(); TZ_ = ss.getSpreadsheetTimeZone();
+    if (request.ledgerId !== ss.getId()) throw new Error('SYNC_WRONG_LEDGER');
     const journal = syncJournal_(ss), count = journal.getLastRow();
     const entries = count > 1 ? journal.getRange(2, 1, count - 1, SYNC_HEADERS.length).getValues() : [];
     const matches = entries.map((row, index) => ({row:row, number:index + 2})).filter(x => x.row[0] === request.mutationId);
@@ -163,6 +165,6 @@ function syncLedgerMutation(pin, input) {
     if (!persisted || syncHash_(request.table,persisted) !== afterHash) {
       return syncFinish_(journal,entry.number,'CONFLICT',{status:'conflict',mutationId:request.mutationId,recordId:request.recordId,remote:persisted ? syncCleanRecord_(request.table,persisted) : null,fingerprint:persisted ? syncHash_(request.table,persisted) : null});
     }
-    return syncFinish_(journal,entry.number,'COMMITTED',{status:'committed',mutationId:request.mutationId,recordId:request.recordId,record:syncCleanRecord_(request.table,persisted),fingerprint:afterHash});
+    return syncFinish_(journal,entry.number,'COMMITTED',{status:'committed',committedAt:new Date().toISOString(),mutationId:request.mutationId,recordId:request.recordId,record:syncCleanRecord_(request.table,persisted),fingerprint:afterHash});
   });
 }
