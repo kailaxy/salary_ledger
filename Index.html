@@ -436,6 +436,17 @@
   /* Home assistant: a quiet workspace within the ledger. */
   .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
   .ledger-assistant{ margin:0 0 22px; padding:20px 18px 0; border:1px solid var(--rule-strong); border-radius:14px; background:linear-gradient(145deg,var(--card),#e5ebdf); overflow:hidden; }
+  .ledger-assistant:not(.is-expanded){ margin-bottom:16px; padding:0; border:0; background:none; overflow:visible; }
+  .ledger-assistant:not(.is-expanded) .assistant-heading,
+  .ledger-assistant:not(.is-expanded) .assistant-help,
+  .ledger-assistant:not(.is-expanded) .assistant-prompts,
+  .ledger-assistant:not(.is-expanded) .assistant-history-head,
+  .ledger-assistant:not(.is-expanded) .assistant-history,
+  .ledger-assistant:not(.is-expanded) .assistant-source{ display:none; }
+  .ledger-assistant:not(.is-expanded) .assistant-composer{ padding:3px 5px; }
+  .assistant-collapse{ flex:none; width:44px; height:44px; border:1px solid var(--rule-strong); background:transparent; color:var(--ink); border-radius:50%; display:grid; place-items:center; cursor:pointer; }
+  .assistant-collapse svg{ width:20px; height:20px; }
+  .assistant-collapse:hover{ background:var(--paper-deep); }
   .assistant-heading{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; }
   .assistant-mark svg{ width:18px; height:18px; }
   .assistant-prompts svg{ width:12px; height:12px; vertical-align:middle; }
@@ -507,8 +518,8 @@
   <p class="banner" id="banner" role="status" hidden></p>
 
   <main id="main">
-    <section class="panel" id="panel-home" role="tabpanel" aria-labelledby="tab-home"><section class="ledger-assistant" aria-labelledby="assistantTitle">
-      <div class="assistant-heading"><div><p class="label">A little clarity</p><h2 id="assistantTitle">Know where your money goes.</h2></div><span class="assistant-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 18 18 6M6 6h12v12"/></svg></span></div>
+    <section class="panel" id="panel-home" role="tabpanel" aria-labelledby="tab-home"><section class="ledger-assistant" aria-label="Ledger assistant" tabindex="-1">
+      <div class="assistant-heading"><div><p class="label">A little clarity</p><h2 id="assistantTitle">Know where your money goes.</h2></div><button class="assistant-collapse" type="button" data-act="collapseassistant" aria-label="Minimize ledger assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 12h12"/></svg></button></div>
       <form id="assistantForm" autocomplete="off">
         <label class="sr-only" for="assistantInput">Ask about your ledger</label>
         <div class="assistant-composer"><input id="assistantInput" type="text" maxlength="300" required placeholder="Ask about your spending…" enterkeyhint="send" aria-describedby="assistantHelp"><button id="assistantSend" type="submit" aria-label="Send question"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button></div>
@@ -998,6 +1009,7 @@
     el.textContent = (offline ? 'Device offline · ' : '') + (snapshotStale ? 'New changes available · Refresh for current answers.' : 'Saved records · Updated ' + stamp);
   }
   function askLedger(text){
+    $('.ledger-assistant').classList.add('is-expanded');
     var history = $('#chatHistory');
     $('#chatHeading').hidden = false;
     var turn = document.createElement('div'); turn.className = 'assistant-turn';
@@ -1050,7 +1062,7 @@
   function openSettings(){
     showGuide(false);
     settingsOpen = true; $('#settingsModal').hidden = false; fillSettings();
-    setTimeout(function(){ var f = $('#sName') || $('#setClose'); if (f) f.focus(); }, 30);
+    setTimeout(function(){ if (settingsOpen) $('#setClose').focus(); }, 30);
   }
   function closeSettings(){
     settingsOpen = false; $('#settingsModal').hidden = true; $('#settingsBody').innerHTML = '';
@@ -1390,7 +1402,8 @@
     if (!t) return;
     if (t.hasAttribute('data-tab')) { showTab(t.getAttribute('data-tab')); return; }
     var act = t.getAttribute('data-act'), id = t.getAttribute('data-id');
-    if (act === 'clearchat') { $('#chatHistory').textContent = ''; $('#chatHeading').hidden = true; $('#assistantInput').focus(); }
+    if (act === 'collapseassistant') { var assistant = $('.ledger-assistant'); assistant.classList.remove('is-expanded'); assistant.focus({preventScroll:true}); }
+    else if (act === 'clearchat') { $('#chatHistory').textContent = ''; $('#chatHeading').hidden = true; $('#assistantInput').focus(); }
     else if (act === 'opensettings') openSettings();
     else if (act === 'closesettings') closeSettings();
 
@@ -1433,6 +1446,7 @@
   });
   window.addEventListener('online', updateAssistantSource);
   window.addEventListener('offline', updateAssistantSource);
+  $('#assistantInput').addEventListener('focus', function(){ $('.ledger-assistant').classList.add('is-expanded'); });
   $('#assistantForm').addEventListener('submit', function(e){ e.preventDefault(); var input = $('#assistantInput'); var text = input.value.trim(); if(text){askLedger(text); input.value = ''; input.focus();} });
   $('#refresh').addEventListener('click', load);
   $('#settingsModal').addEventListener('click', function(e){ if (e.target === this) closeSettings(); });
