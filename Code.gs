@@ -356,7 +356,7 @@ function getLedgerSnapshot(pin) {
     let syncVersion = 0;
     if (typeof syncJournal_ === 'function') { try { syncJournal_(ss); syncVersion = 1; } catch (e) { /* Explicit preparation is required. */ } }
     return {
-      capabilities: {recordSyncVersion: syncVersion},
+      capabilities: {recordSyncVersion: syncVersion, fundSyncVersion: syncVersion && typeof fundSyncVersion_ === 'function' ? fundSyncVersion_() : 0},
       formatVersion: 1, ledgerId: ss.getId(), capturedAt: now.toISOString(),
       timezone: TZ_, currency: settings.currency || '₱', minorUnitScale: 2,
       tables: tables, state: buildState_(ss, now)

@@ -42,7 +42,7 @@ Pairing codes last ten minutes and can be used once. Generating a fresh code rep
 
 ## Offline behavior and limits
 
-After first synchronization, the APK can cold-open its bundled UI, restore the local ledger/outbox, answer supported local questions, and save confirmed income/ordinary expense additions and edits without internet. Sync runs on refresh, online events and authorized app resume; it is not an Android background worker. Funds, loans, plans, categories, settings and deletion remain online-only in this increment. The LLM is not integrated.
+After first synchronization, the APK can cold-open its bundled UI, restore the local ledger/outbox, answer supported local questions, and save confirmed income/ordinary expense additions and edits, plus fund deposits and withdrawals, without internet. Fund transfers require the updated Code.gs/Sync.gs deployment and one online refresh. Sync runs on refresh, online events and authorized app resume; it is not an Android background worker. Fund editing, loans, plans, categories, settings and deletion remain online-only in this increment. The LLM is not integrated.
 
 The native bridge accepts only main-frame messages from the exact local origin and packaged page. It cannot fetch arbitrary URLs or invoke owner menu functions. External navigation and network resources in WebView are blocked. Native HTTPS requests go only to the compiled Apps Script URL and its permitted Google ContentService redirect; credentials are never forwarded in the redirected GET. Platform TLS verification remains enabled.
 

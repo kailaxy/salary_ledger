@@ -74,7 +74,7 @@ test('conflicting prepared replay preserves remote data and remains terminal',()
  const index=Array.from(e.ctx.colsOf_('TRANSACTIONS')).indexOf('amount');e.sheets.TRANSACTIONS.rows[1][index]=750;
  assert.equal(e.run(request).status,'conflict');assert.equal(e.run(request).status,'conflict');assert.equal(e.sheets.TRANSACTIONS.rows[1][index],750);
 });
-test('reject unsafe fields, invalid amounts/dates, formulas, and unsupported loan or fund writes',()=>{
+test('reject unsafe fields, invalid amounts/dates, formulas, and linked loan edits',()=>{
  const e=environment();e.prepare();
  for(const request of [addition({operation:'delete'}),addition({code:'alert(1)'}),addition({values:{...addition().values,amountMinor:1.1}}),addition({values:{...addition().values,date:'2026-02-30'}}),addition({values:{...addition().values,note:'=IMPORTXML("bad")'}})])assert.throws(()=>e.run(request));
  assert.equal(e.sheets.TRANSACTIONS.rows.length,1);
@@ -92,4 +92,36 @@ test('income additions and edits preserve kind and source; stable-ID collision n
 
 test('a valid PIN cannot send a mutation to the wrong ledger',()=>{
  const e=environment();e.prepare();assert.throws(()=>e.run(addition({ledgerId:'different-sheet'})),/SYNC_WRONG_LEDGER/);assert.equal(e.sheets.TRANSACTIONS.rows.length,1);
+});
+test('fund transfers preserve balance, retry safely and never become expenses',()=>{
+ const e=environment();e.prepare();e.put('CATEGORIES',{category_id:'cat_fund',name:'Emergency',kind:'FUND'});
+ const deposit=addition({values:{...addition().values,categoryId:'cat_fund',type:'FUND_IN'}});
+ assert.equal(e.run(deposit).record.type,'FUND_IN');assert.equal(e.run(deposit).status,'committed');
+ const withdrawal=addition({mutationId:'request_fund_000002',recordId:'txn_fund_00000002',values:{...deposit.values,type:'FUND_OUT',amountMinor:10000}});
+ assert.equal(e.run(withdrawal).status,'committed');assert.equal(e.run(withdrawal).status,'committed');
+ assert.equal(e.ctx.fundBalance_({getSheetByName:n=>e.sheets[n]},'cat_fund'),23.45);
+ const over=addition({mutationId:'request_fund_000003',recordId:'txn_fund_00000003',values:{...withdrawal.values,amountMinor:2346}});
+ assert.equal(e.run(over).status,'conflict');assert.equal(e.sheets.TRANSACTIONS.rows.length,3);
+ assert.throws(()=>e.run(edit(e.run(deposit))),/ordinary expenses/);
+});
+test('prepared withdrawal rechecks funds after a crash and another device withdrawal',()=>{
+ const e=environment();e.prepare();e.put('CATEGORIES',{category_id:'cat_fund',name:'Emergency',kind:'FUND'});
+ const deposit=addition({values:{...addition().values,categoryId:'cat_fund',type:'FUND_IN',amountMinor:10000}});e.run(deposit);
+ const withdrawal=addition({mutationId:'request_fund_000002',recordId:'txn_fund_00000002',values:{...deposit.values,type:'FUND_OUT',amountMinor:9000}});
+ e.crashAt(1);assert.throws(()=>e.run(withdrawal),/SIMULATED_CRASH/);e.reset();
+ e.run({...withdrawal,mutationId:'request_fund_000003',recordId:'txn_fund_00000003'});
+ assert.equal(e.run(withdrawal).status,'conflict');assert.equal(e.run(withdrawal).status,'conflict');
+ assert.equal(e.sheets.TRANSACTIONS.rows.length,3);
+});
+
+test('withdrawal crash recovery never subtracts the fund balance twice',()=>{
+ for(const crash of [1,2,3]){
+  const e=environment();e.prepare();e.put('CATEGORIES',{category_id:'cat_fund',name:'Emergency',kind:'FUND'});
+  const deposit=addition({values:{...addition().values,categoryId:'cat_fund',type:'FUND_IN',amountMinor:10000}});e.run(deposit);
+  const withdrawal=addition({mutationId:'request_fund_000002',recordId:'txn_fund_00000002',values:{...deposit.values,type:'FUND_OUT',amountMinor:9000}});
+  e.crashAt(crash);assert.throws(()=>e.run(withdrawal),/SIMULATED_CRASH/);e.reset();
+  assert.equal(e.run(withdrawal).status,'committed');assert.equal(e.run(withdrawal).status,'committed');
+  assert.equal(e.sheets.TRANSACTIONS.rows.length,3);
+  assert.equal(e.ctx.fundBalance_({getSheetByName:n=>e.sheets[n]},'cat_fund'),10);
+ }
 });

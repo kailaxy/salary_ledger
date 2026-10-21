@@ -1,5 +1,5 @@
 /** Reliable single-record sync, v1. Add this file beside Code.gs.
- * Supports INCOME and unlinked EXPENSE only. Existing online RPCs are unchanged.
+ * Supports INCOME, unlinked EXPENSE and add-only fund transfers. Existing online RPCs are unchanged.
  * SYNC_JOURNAL is durable and must not be deleted while clients can retry requests.
  */
 const SYNC_HEADERS = ['request_id', 'request_json', 'status', 'table_name', 'record_id', 'before_json', 'after_json', 'receipt_json', 'created_at'];
@@ -57,17 +57,18 @@ function syncValidate_(request) {
       !/^[A-Za-z0-9_-]{8,80}$/.test(request.recordId)) fail_('Invalid record ID.');
   if (request.operation === 'edit' && (typeof request.baseFingerprint !== 'string' || !/^[a-f0-9]{64}$/.test(request.baseFingerprint))) fail_('An edit needs the base fingerprint.');
   if (request.operation === 'add' && request.baseFingerprint !== undefined) fail_('An addition cannot have a base fingerprint.');
-  const fields = request.table === 'INCOME' ? ['periodId', 'date', 'amountMinor', 'kind', 'source', 'note'] : ['periodId', 'date', 'amountMinor', 'categoryId', 'note'];
+  const fields = request.table === 'INCOME' ? ['periodId', 'date', 'amountMinor', 'kind', 'source', 'note'] : ['periodId', 'date', 'amountMinor', 'categoryId', 'note', 'type'];
   syncFields_(request.values, fields);
   const values = request.values;
   if (!Object.keys(values).length) fail_('No changes supplied.');
-  if (request.operation === 'add' && fields.some(k => values[k] === undefined)) fail_('An addition needs all record fields.');
+  if (request.operation === 'add' && fields.some(k => k !== 'type' && values[k] === undefined)) fail_('An addition needs all record fields.');
   if (values.amountMinor !== undefined && (!Number.isSafeInteger(values.amountMinor) || values.amountMinor <= 0 || values.amountMinor > MAX_AMOUNT * 100)) fail_('Invalid minor-unit amount.');
   if (values.date !== undefined) {
     if (typeof values.date !== 'string') fail_('Invalid date.');
     dateIn_(values.date, 'date');
   }
   ['periodId', 'categoryId'].forEach(k => { if (values[k] !== undefined && (typeof values[k] !== 'string' || !values[k] || values[k].length > 80)) fail_('Invalid ' + k + '.'); });
+  if (values.type !== undefined && (request.table !== 'TRANSACTIONS' || ['EXPENSE','FUND_IN','FUND_OUT'].indexOf(values.type) < 0 || request.operation !== 'add')) fail_('Invalid transfer type.');
   if (values.kind !== undefined && ENUMS.INCOME.kind.indexOf(values.kind) < 0) fail_('Invalid income kind.');
   if (values.note !== undefined) syncText_(values.note, 200, false, 'Note');
   if (values.source !== undefined) syncText_(values.source, 60, false, 'Source');
@@ -83,14 +84,14 @@ function syncAfter_(ss, request, before) {
   const result = before ? syncCleanRecord_(request.table, before) : income ? {
     income_id: request.recordId, period_id: '', received_date: '', amount: 0, kind: '', source: '', note: '', created_at: stamp_(), updated_at: stamp_(), deleted_at: ''
   } : { txn_id: request.recordId, period_id: '', category_id: '', type: 'EXPENSE', txn_date: '', amount: 0, note: '', created_at: stamp_(), updated_at: stamp_(), deleted_at: '' };
-  const mapping = income ? {periodId:'period_id', date:'received_date', kind:'kind', source:'source', note:'note'} : {periodId:'period_id', date:'txn_date', categoryId:'category_id', note:'note'};
+  const mapping = income ? {periodId:'period_id', date:'received_date', kind:'kind', source:'source', note:'note'} : {periodId:'period_id', date:'txn_date', categoryId:'category_id', note:'note', type:'type'};
   Object.keys(mapping).forEach(k => {
     if (v[k] !== undefined) result[mapping[k]] = k === 'note' ? syncText_(v[k], 200, false, 'Note') : k === 'source' ? syncText_(v[k], 60, false, 'Source') : v[k];
   });
   if (v.amountMinor !== undefined) result.amount = v.amountMinor / 100;
   result.updated_at = stamp_();
   findPeriod_(ss, result.period_id);
-  if (!income) findCategory_(ss, result.category_id, 'SPENDING');
+  if (!income) findCategory_(ss, result.category_id, result.type === 'EXPENSE' ? 'SPENDING' : 'FUND');
   return result;
 }
 function syncCurrent_(ss, table, id) {
@@ -148,12 +149,12 @@ function syncLedgerMutation(pin, input) {
     // If the row already equals the intended result, recover the receipt without reapplying.
     if (!(current && syncHash_(request.table,current) === afterHash)) {
       const baseMatches = before ? current && syncHash_(request.table,current) === syncHash_(request.table,before) : !current;
-      if (!baseMatches || syncLinked_(ss,request)) {
+      if (!baseMatches || syncLinked_(ss,request) || (after.type === 'FUND_OUT' && Math.round(fundBalance_(ss,after.category_id)*100) < Math.round(after.amount*100))) {
         return syncFinish_(journal,entry.number,'CONFLICT',{status:'conflict',mutationId:request.mutationId,recordId:request.recordId,remote:current ? syncCleanRecord_(request.table,current) : null,fingerprint:current ? syncHash_(request.table,current) : null});
       }
       // Recheck relationships after a crash before replaying the prepared write.
       findPeriod_(ss, after.period_id);
-      if (request.table === 'TRANSACTIONS') findCategory_(ss,after.category_id,'SPENDING');
+      if (request.table === 'TRANSACTIONS') findCategory_(ss,after.category_id,after.type === 'EXPENSE' ? 'SPENDING' : 'FUND');
       if (current) {
         const cols = colsOf_(request.table);
         ss.getSheetByName(request.table).getRange(current._row,1,1,cols.length).setNumberFormats([cols.map(colFmt_)]).setValues([cols.map(c => after[c])]);
@@ -168,3 +169,6 @@ function syncLedgerMutation(pin, input) {
     return syncFinish_(journal,entry.number,'COMMITTED',{status:'committed',committedAt:new Date().toISOString(),mutationId:request.mutationId,recordId:request.recordId,record:syncCleanRecord_(request.table,persisted),fingerprint:afterHash});
   });
 }
+
+/** Capability marker for add-only offline fund transfers. */
+function fundSyncVersion_() { return 1; }

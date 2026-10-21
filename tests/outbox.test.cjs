@@ -75,3 +75,24 @@ test('an unprepared cached backend cannot accept a local financial write',async(
  await assert.rejects(local.enqueue(p,pending.revision(s,[],p.table,p.recordId)),/prepare reliable sync/);
  assert.equal((await local.list(s.ledgerId)).length,0);
 });
+test('offline fund transfers persist and project net funds without inflating expenses',async()=>{
+ const {local,pending}=client(),s=snapshot();s.capabilities.fundSyncVersion=1;
+ s.tables.CATEGORIES.push({record:{category_id:'cat_fund',name:'Emergency',kind:'FUND',is_archived:false},fingerprint:'a'.repeat(64)});
+ s.state.categories.push({id:'cat_fund',name:'Emergency',kind:'FUND',actual:0});await local.save(s);
+ const deposit=add(s);deposit.values={...deposit.values,type:'FUND_IN',categoryId:'cat_fund',amountMinor:10000};
+ await local.enqueue(deposit,pending.revision(s,[],deposit.table,deposit.recordId));
+ let entries=await local.list(s.ledgerId);
+ const withdrawal={...deposit,mutationId:'request_fund_000002',recordId:'txn_fund_00000002',values:{...deposit.values,type:'FUND_OUT',amountMinor:6000}};
+ await local.enqueue(withdrawal,pending.revision(s,entries,withdrawal.table,withdrawal.recordId));
+ entries=await client().local.list(s.ledgerId);const view=pending.project(s,entries);
+ assert.equal(view.state.summary.spent,0);assert.equal(view.state.summary.inFunds,40);assert.equal(view.state.periods[0].funds,40);assert.equal(view.state.categories[1].actual,40);assert.equal(view.state.byCat.per_test.cat_fund,40);
+ const tooMuch={...withdrawal,mutationId:'request_fund_000003',recordId:'txn_fund_00000003',values:{...withdrawal.values,amountMinor:4001}};
+ await assert.rejects(local.enqueue(tooMuch,pending.revision(s,entries,tooMuch.table,tooMuch.recordId)),/only holds/);
+ assert.equal((await local.list(s.ledgerId)).length,2);
+});
+test('offline funds require explicit backend capability and a matching category',()=>{
+ const {pending}=client(),s=snapshot(),p=add(s);p.values.type='FUND_IN';
+ assert.throws(()=>pending.validate(s,[],p,pending.revision(s,[],p.table,p.recordId)),/Update Apps Script/);
+ s.capabilities.fundSyncVersion=1;
+ assert.throws(()=>pending.validate(s,[],p,pending.revision(s,[],p.table,p.recordId)),/active fund/);
+});
