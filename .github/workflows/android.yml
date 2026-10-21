@@ -23,7 +23,20 @@ jobs:
         with:
           gradle-version: '8.9'
       - name: Install Android SDK
-        run: sdkmanager 'platforms;android-35' 'build-tools;34.0.0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          if [[ -z "$sdk_root" ]]; then
+            echo "Android SDK root is missing from the runner environment." >&2
+            exit 1
+          fi
+          sdk_manager="$sdk_root/cmdline-tools/latest/bin/sdkmanager"
+          if [[ ! -x "$sdk_manager" ]]; then
+            echo "Android SDK manager not found at $sdk_manager" >&2
+            exit 1
+          fi
+          "$sdk_manager" --sdk_root="$sdk_root" 'platforms;android-35' 'build-tools;34.0.0'
       - name: Build and lint
         working-directory: android
         run: gradle --no-daemon --stacktrace assembleDebug lintDebug
