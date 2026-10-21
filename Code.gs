@@ -65,6 +65,8 @@ function onOpen() {
     .addItem('Set up (run once)', 'setupLedger')
     .addItem('Set or change PIN', 'setPinFromMenu')
     .addItem('Prepare reliable sync', 'prepareReliableSync_')
+    .addItem('Pair Android device', 'createAndroidPairing_')
+    .addItem('Revoke Android devices', 'revokeAndroidDevices_')
     .addToUi();
 }
 

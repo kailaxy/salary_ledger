@@ -6,7 +6,7 @@ const vm=require('node:vm');
 const {indexedDB}=require('fake-indexeddb');
 const scripts=[...fs.readFileSync(path.join(__dirname,'../Index.html'),'utf8').matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(m=>m[1]);
 let ledgerNumber=0;
-function client(){const c=vm.createContext({indexedDB,console});vm.runInContext(scripts[0],c);vm.runInContext(scripts.find(s=>s.includes('Local single-record mutations')),c);return {local:c.LedgerLocal,pending:c.LedgerPending};}
+function client(){const c=vm.createContext({indexedDB,console});vm.runInContext(scripts.find(s=>s.includes('Durable full-snapshot storage')),c);vm.runInContext(scripts.find(s=>s.includes('Local single-record mutations')),c);return {local:c.LedgerLocal,pending:c.LedgerPending};}
 function snapshot(){
  const tables={};for(const name of ['SETTINGS','PAY_PERIODS','INCOME','CATEGORIES','FUND_GOALS','BUDGET_LINES','TRANSACTIONS','LOANS','LOAN_INSTALLMENTS','LOAN_PAYMENTS'])tables[name]=[];
  const wrap=record=>({record,fingerprint:'a'.repeat(64)});

@@ -590,6 +590,7 @@
       </div>
       <div id="settingsView">
         <p id="localStatus" role="status" style="font-size:13px;line-height:1.5"></p>
+        <div id="nativeDeviceSettings" hidden><p class="sub">This APK keeps its own offline copy. Connect once to download your Sheet; reconnect here if access is revoked.</p><button class="btn2" type="button" data-act="connectdevice" id="connectDeviceBtn" style="margin:12px 0">Connect this device</button></div>
         <div id="settingsBody"></div>
         <div class="guide-nav"><button class="btn2" id="guideBtn" type="button" data-act="openguide">Guide</button></div>
       </div>
@@ -677,6 +678,33 @@
     <button class="go" type="submit">Unlock</button>
   </form>
 </div>
+
+<script>
+/* Native transport only activates on the packaged, trusted app origin. */
+(function(root){
+  'use strict';
+  var bridge=root.LedgerAndroid;
+  var available=root.location.origin==='https://appassets.androidplatform.net' && bridge && typeof bridge.postMessage==='function';
+  var pending=Object.create(null),serial=0;
+  if(available)bridge.onmessage=function(event){
+    var response;try{response=JSON.parse(event.data);}catch(error){return;}
+    if(!response||typeof response.id!=='string'||!pending[response.id])return;
+    var request=pending[response.id];delete pending[response.id];clearTimeout(request.timer);
+    if(response.ok===true)request.resolve(response.result);else request.reject(new Error(typeof response.error==='string'?response.error:'INVALID_NATIVE_REPLY'));
+  };
+  function send(action,method,args){
+    return new Promise(function(resolve,reject){
+      if(!available){reject(new Error('NATIVE_UNAVAILABLE'));return;}
+      var id='native_'+Date.now().toString(36)+'_'+(++serial),request={version:1,id:id,action:action};
+      if(action==='rpc'){request.method=method;request.args=args;}
+      var timer=setTimeout(function(){delete pending[id];reject(new Error('Native request timed out. Saved changes are preserved.'));},action==='pair'?600000:60000);
+      pending[id]={resolve:resolve,reject:reject,timer:timer};
+      try{bridge.postMessage(JSON.stringify(request));}catch(error){clearTimeout(timer);delete pending[id];reject(new Error('NATIVE_UNAVAILABLE'));}
+    });
+  }
+  root.LedgerNative={available:!!available,rpc:function(method,args){return send('rpc',method,args);},pair:function(){return send('pair');}};
+})(window);
+</script>
 
 <script>
 /* Durable full-snapshot storage. No credentials are stored here. */
@@ -1048,12 +1076,15 @@
     var el = $('#localStatus'); if (el) el.textContent = message;
   }
   var tab = store.get('sl2_tab'); if (!TITLES[tab]) tab = 'home';
-  var pin = store.get('sl2_pin') || '';
+  var nativeMode=LedgerNative.available;
+  var pin = nativeMode ? 'native-device' : store.get('sl2_pin') || '';
+  if(nativeMode)store.del('sl2_pin');
   var planPer = null, addType = 'Expense', armed = null, armTimer = null, cids = {}, toastTimer = null;
   var catDraft = null, loanOpen = false;
 
   function call(fn){
     var args = Array.prototype.slice.call(arguments, 1);
+    if(nativeMode)return LedgerNative.rpc(fn,args.slice(1));
     return new Promise(function(resolve, reject){
       var timer=setTimeout(function(){reject(new Error('Connection timed out. Pending changes are preserved.'));},25000);
       function finish(callback,value){clearTimeout(timer);callback(value);}
@@ -1071,6 +1102,7 @@
   }
   function errText(err){
     var m = String((err && err.message) || err), r;
+    if(nativeMode && /BAD_PIN|PIN_REQUIRED|PIN_NOT_SET|LOCKED|DEVICE_REVOKED/.test(m))return 'Reconnect this device in Settings to authorize synchronization.';
     if ((r = /INVALID: (.*)$/.exec(m))) return r[1];
     if (/BAD_PIN/.test(m)) { pin = ''; store.del('sl2_pin'); showLock('That PIN isn’t right.'); return ''; }
     if (/PIN_REQUIRED/.test(m)) { showLock(''); return ''; }
@@ -1183,7 +1215,8 @@
   function fillSettings(){
     if (!settingsOpen) return;
     setLocalStatus(localStatus);
-    $('#settingsBody').innerHTML = data && data.setupDone ? settingsHTML(data) : setupCard();
+    $('#nativeDeviceSettings').hidden=!nativeMode;
+    $('#settingsBody').innerHTML = data && data.setupDone ? settingsHTML(data) : nativeMode&&!data ? '<p class="sub">Connect this device to download your ledger. Your Google Sheet remains the cloud copy.</p>' : setupCard();
   }
   function showGuide(show){
     $('#settingsView').hidden = show; $('#guideView').hidden = !show;
@@ -1406,7 +1439,7 @@
           await LedgerLocal.acknowledge(ledgerId,next.mutationId,receipt);
         }catch(error){
           var message=String(error&&error.message||error);
-          await LedgerLocal.failure(ledgerId,next.mutationId,/SYNC_NOT_PREPARED/.test(message)?'Prepare reliable sync in the Sheet, redeploy, and retry.':/SYNC_WRONG_LEDGER/.test(message)?'Wrong spreadsheet deployment. Pending change is preserved.':/BAD_PIN|PIN_REQUIRED|LOCKED/.test(message)?'Unlock online with a valid PIN, then retry.':message);
+          await LedgerLocal.failure(ledgerId,next.mutationId,/SYNC_NOT_PREPARED/.test(message)?'Prepare reliable sync in the Sheet, redeploy, and retry.':/SYNC_WRONG_LEDGER/.test(message)?'Wrong spreadsheet deployment. Pending change is preserved.':/DEVICE_UNPAIRED|DEVICE_REVOKED/.test(message)?'Connect this device in Settings to resume sync.':/BAD_PIN|PIN_REQUIRED|LOCKED/.test(message)?'Unlock online with a valid PIN, then retry.':message);
           if(/BAD_PIN|PIN_REQUIRED|LOCKED/.test(message)){errText(error);}
           break;
         }
@@ -1700,7 +1733,7 @@
   /* ---------- loading / errors / PIN ---------- */
   function showBanner(msg){ var b = $('#banner'); b.innerHTML = '<span>' + esc(msg) + '</span><button type="button" id="retry">Retry</button>'; b.hidden = false; }
   function hideBanner(){ $('#banner').hidden = true; }
-  function showLock(msg){ $('#lock').hidden = false; $('#pinErr').textContent = msg || ''; $('#pin').value = ''; setTimeout(function(){ $('#pin').focus(); }, 50); }
+  function showLock(msg){ if(nativeMode){showBanner('Reconnect this device in Settings to authorize synchronization.');return;} $('#lock').hidden = false; $('#pinErr').textContent = msg || ''; $('#pin').value = ''; setTimeout(function(){ $('#pin').focus(); }, 50); }
   function hideLock(){ $('#lock').hidden = true; }
   function load(){
     if (busy) return Promise.resolve();
@@ -1721,9 +1754,11 @@
     }).catch(function(err){
       setLocalStatus('Refresh failed. Saved records and queued changes are preserved.');
       var m = String((err && err.message) || err);
-      if (/BAD_PIN/.test(m)) { pin = ''; store.del('sl2_pin'); showLock('That PIN isn’t right.'); }
+      if(nativeMode && /BAD_PIN|PIN_REQUIRED|PIN_NOT_SET|LOCKED|DEVICE_UNPAIRED|DEVICE_REVOKED/.test(m)) showBanner('Open Settings → Connect this device to authorize synchronization. Saved records and pending changes stay on this device.');
+      else if (/BAD_PIN/.test(m)) { pin = ''; store.del('sl2_pin'); showLock('That PIN isn’t right.'); }
       else if (/PIN_REQUIRED/.test(m)) showLock('');
       else if (/LOCKED/.test(m)) showLock('Too many wrong tries. Wait 10 minutes, then try again.');
+      else if (/DEVICE_UNPAIRED|DEVICE_REVOKED/.test(m)) showBanner('Open Settings → Connect this device to authorize synchronization. Saved records and pending changes stay on this device.');
       else if (/PIN_NOT_SET/.test(m)) showBanner('Set a PIN in the sheet before downloading a complete local ledger.');
       else showBanner(data ? 'Could not refresh. Showing saved records, including pending local changes.' : 'Could not load your sheet. ' + m);
       renderPending();
@@ -1738,7 +1773,8 @@
     if (!t) return;
     if (t.hasAttribute('data-tab')) { showTab(t.getAttribute('data-tab')); return; }
     var act = t.getAttribute('data-act'), id = t.getAttribute('data-id');
-    if(act==='editentry')editEntry(t.getAttribute('data-table'),id);
+    if(act==='connectdevice'){var connect=$('#connectDeviceBtn');connect.disabled=true;LedgerNative.pair().then(function(){toast('Device connected. Downloading your ledger…');return load();}).catch(function(error){if(!/PAIR_CANCELLED/.test(error.message))toast(error.message,true);}).finally(function(){connect.disabled=false;});}
+    else if(act==='editentry')editEntry(t.getAttribute('data-table'),id);
     else if(act==='canceledit')cancelEdit();
     else if(act==='retrysync')load();
     else if(act==='resolvecloud')resolveCloud(id);
@@ -1786,6 +1822,7 @@
   });
   window.addEventListener('online', function(){updateAssistantSource();load();});
   window.addEventListener('offline', updateAssistantSource);
+  window.addEventListener('ledgerresume',function(){updateAssistantSource();load();});
   $('#reviewCancel').addEventListener('click',function(){closeReview(false);});
   $('#reviewConfirm').addEventListener('click',function(){closeReview(true);});
   $('#entryReview').addEventListener('click',function(e){if(e.target===this)closeReview(false);});
@@ -1810,7 +1847,7 @@
   });
   $('#banner').addEventListener('click', function(e){ if (e.target.id === 'retry') load(); });
   $('#lock').addEventListener('submit', function(e){
-    e.preventDefault();
+    e.preventDefault(); if(nativeMode)return;
     var v = $('#pin').value.trim();
     if (!v) { $('#pinErr').textContent = 'Type your PIN first.'; return; }
     pin = v; store.set('sl2_pin', v); $('#pinErr').textContent = ''; load();

@@ -10,7 +10,7 @@ const html = fs.readFileSync(path.join(root,'Index.html'),'utf8');
 const scripts = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(m=>m[1]);
 function client(){
   const ctx = vm.createContext({indexedDB, console});
-  vm.runInContext(scripts[0],ctx);
+  vm.runInContext(scripts.find(s=>s.includes('Durable full-snapshot storage')),ctx);
   return ctx.LedgerLocal;
 }
 function snapshot(){

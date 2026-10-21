@@ -1,6 +1,6 @@
 # Offline assistant integration plan
 
-Status: snapshots, durable local cache, read-only Home assistant, and single-record income/expense outbox synchronization have been implemented incrementally; see offline-step-1.md through offline-step-4.md. Packaged offline startup, secure native transport, broader offline forms and on-device inference remain outstanding. Per the owner’s direction, LLM integration is last.
+Status: snapshots, durable local cache, read-only Home assistant, and single-record income/expense outbox synchronization have been implemented incrementally; see offline-step-1.md through offline-step-4.md. Packaged offline startup and native pairing/transport are now implemented for device validation (offline-step-5.md). Broader offline forms and on-device inference remain outstanding. Per the owner’s direction, LLM integration is last.
 
 ## Inspected sources
 

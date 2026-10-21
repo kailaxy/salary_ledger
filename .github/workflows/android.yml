@@ -2,9 +2,9 @@ name: Build Android APK
 on:
   workflow_dispatch:
   push:
-    paths: ['android/**', '.github/workflows/android.yml']
+    paths: ['android/**', 'Index.html', '.github/workflows/android.yml']
   pull_request:
-    paths: ['android/**', '.github/workflows/android.yml']
+    paths: ['android/**', 'Index.html', '.github/workflows/android.yml']
 permissions:
   contents: read
 jobs:
@@ -37,9 +37,9 @@ jobs:
             exit 1
           fi
           "$sdk_manager" --sdk_root="$sdk_root" 'platforms;android-35' 'build-tools;34.0.0'
-      - name: Build and lint
+      - name: Build, lint and test
         working-directory: android
-        run: gradle --no-daemon --stacktrace assembleDebug lintDebug
+        run: gradle --no-daemon --stacktrace assembleDebug lintDebug testDebugUnitTest
       - uses: actions/upload-artifact@v6
         with:
           name: salary-ledger-debug-apk
@@ -50,5 +50,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: android-build-reports
-          path: android/app/build/reports/
+          path: |
+            android/app/build/reports/
+            android/app/build/test-results/
           if-no-files-found: ignore
