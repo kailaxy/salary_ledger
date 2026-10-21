@@ -64,6 +64,7 @@ function onOpen() {
   SpreadsheetApp.getUi().createMenu(APP_NAME)
     .addItem('Set up (run once)', 'setupLedger')
     .addItem('Set or change PIN', 'setPinFromMenu')
+    .addItem('Prepare reliable sync', 'prepareReliableSync_')
     .addToUi();
 }
 

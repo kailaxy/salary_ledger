@@ -1,0 +1,24 @@
+name: Ledger tests
+on:
+  workflow_dispatch:
+  push:
+    paths: ['Code.gs', 'Sync.gs', 'Index.html', 'tests/**', '.github/workflows/ledger-tests.yml']
+  pull_request:
+    paths: ['Code.gs', 'Sync.gs', 'Index.html', 'tests/**', '.github/workflows/ledger-tests.yml']
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+      - run: npm ci
+        working-directory: tests
+      - run: npm test
+        working-directory: tests
