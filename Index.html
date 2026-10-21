@@ -498,7 +498,14 @@
       <div id="settingsView">
         <p id="localStatus" role="status" style="font-size:13px;line-height:1.5"></p>
         <div id="settingsBody"></div>
-        <div class="guide-nav"><button class="btn2" id="guideBtn" type="button" data-act="openguide">Guide</button></div>
+        <div class="guide-nav"><button class="btn2" id="assistantBtn" type="button" data-act="openassistant">Ask about my ledger</button> <button class="btn2" id="guideBtn" type="button" data-act="openguide">Guide</button></div>
+      </div>
+      <div id="assistantView" hidden>
+        <button class="btn2" id="assistantBack" type="button" data-act="backassistant">Back to settings</button>
+        <p class="hint" style="margin:14px 0">Read-only local assistant · supported questions use cached records, with no cloud AI. Offline writes and a language model are not enabled yet.</p>
+        <div class="btn-row"><button class="btn2" type="button" data-question="What's my biggest expense this month?">Biggest expense</button><button class="btn2" type="button" data-question="How much salary did I receive this year?">Salary this year</button><button class="btn2" type="button" data-question="Compare this month's expenses with last month's.">Compare months</button></div>
+        <div id="chatHistory" role="log" aria-live="polite" style="max-height:40vh;overflow-y:auto;margin:14px 0"></div>
+        <form id="assistantForm" autocomplete="off"><label class="fld"><span class="label">Ask a question</span><input id="assistantInput" type="text" maxlength="300" required placeholder="Show my top five expenses"></label><button class="btn2 solid" type="submit">Ask</button></form>
       </div>
       <div id="guideView" hidden>
         <button class="btn2" id="guideBack" type="button" data-act="backsettings">Back to settings</button>
@@ -657,6 +664,106 @@
 </script>
 
 <script>
+/* Deterministic cached-ledger query engine; no network or generated code. */
+(function(root){
+  'use strict';
+  function cents(value){
+    var text = String(value), match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(text);
+    if (!match) throw new Error('A record has an invalid currency amount. Refresh or correct it in the sheet.');
+    var n = Number(match[1]) * 100 + Number((match[2] || '').padEnd(2,'0'));
+    if (!Number.isSafeInteger(n)) throw new Error('Amount exceeds the supported precision.');
+    return n;
+  }
+  function add(a,b){ var n=a+b; if(!Number.isSafeInteger(n)) throw new Error('Total exceeds supported precision.'); return n; }
+  function validDate(s){
+    if(typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+    var d=new Date(s+'T00:00:00Z'); return !isNaN(d) && d.toISOString().slice(0,10)===s;
+  }
+  function today(timezone, now){
+    var parts=new Intl.DateTimeFormat('en-US',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now || new Date()), p={};
+    parts.forEach(function(x){p[x.type]=x.value;}); return p.year+'-'+p.month+'-'+p.day;
+  }
+  function bounds(range, timezone, now){
+    var t=today(timezone,now), y=+t.slice(0,4), m=+t.slice(5,7);
+    function iso(d){return d.toISOString().slice(0,10);}
+    if(range==='all') return null;
+    if(range==='today') return [t,t];
+    if(range==='this_year') return [y+'-01-01',y+'-12-31'];
+    if(range==='last_month') m--;
+    if(range==='last_month' || range==='this_month') return [iso(new Date(Date.UTC(y,m-1,1))),iso(new Date(Date.UTC(y,m,0)))];
+    throw new Error('Unsupported date range.');
+  }
+  function validate(q){
+    var allowed=['action','operation','kind','range','categoryId','incomeKind','minMinor','maxMinor','text','entryId','limit'];
+    if(!q || typeof q!=='object' || Array.isArray(q) || Object.keys(q).some(function(k){return allowed.indexOf(k)<0;})) throw new Error('Unsupported query fields.');
+    if(q.action!=='query' || ['sum','average','min','max','top','count','list','categories','compare','cashflow'].indexOf(q.operation)<0) throw new Error('Unsupported query operation.');
+    if(['expense','income'].indexOf(q.kind)<0 || ['all','today','this_month','last_month','this_year'].indexOf(q.range)<0) throw new Error('Choose an explicit record type and date range.');
+    ['categoryId','text','entryId'].forEach(function(k){if(q[k]!==undefined && (typeof q[k]!=='string' || !q[k] || q[k].length>200))throw new Error('Invalid '+k);});
+    if(q.incomeKind!==undefined && ['SALARY','BONUS','OTHER'].indexOf(q.incomeKind)<0) throw new Error('Invalid income kind.');
+    ['minMinor','maxMinor'].forEach(function(k){if(q[k]!==undefined && (!Number.isSafeInteger(q[k]) || q[k]<0))throw new Error('Invalid amount filter.');});
+    if(q.minMinor!==undefined && q.maxMinor!==undefined && q.minMinor>q.maxMinor)throw new Error('Invalid amount range.');
+    if(q.limit!==undefined && (!Number.isInteger(q.limit)||q.limit<1||q.limit>50))throw new Error('Limit must be between 1 and 50.');
+    if((q.categoryId && q.kind!=='expense') || (q.incomeKind && q.kind!=='income'))throw new Error('Filter does not match record type.');
+    if(q.operation==='categories' && q.kind!=='expense')throw new Error('Category totals apply to expenses.');
+    if(q.operation==='compare' && q.range!=='this_month')throw new Error('Comparison currently supports this month versus last month.');
+    if(q.operation==='cashflow' && (q.categoryId||q.incomeKind||q.minMinor!==undefined||q.maxMinor!==undefined||q.text||q.entryId))throw new Error('Cash flow does not support these filters.');
+    return q;
+  }
+  function query(snapshot,q,now){
+    validate(q);
+    if(!snapshot || !snapshot.tables || !snapshot.timezone)throw new Error('Refresh online once to download a complete ledger.');
+    var cats=snapshot.tables.CATEGORIES.filter(function(x){return !x.record.deleted_at;}).map(function(x){return x.record;});
+    if(q.categoryId && !cats.some(function(c){return c.category_id===q.categoryId;}))throw new Error('Unknown category.');
+    function records(kind,range){
+      var dates=bounds(range,snapshot.timezone,now), table=kind==='income'?'INCOME':'TRANSACTIONS';
+      return snapshot.tables[table].filter(function(x){var r=x.record;return !r.deleted_at && (kind==='income'||r.type==='EXPENSE');}).map(function(x){
+        var r=x.record, date=kind==='income'?r.received_date:r.txn_date;
+        if(!validDate(date))throw new Error('A ledger record has an invalid date. Correct it before querying.');
+        return {id:kind==='income'?r.income_id:r.txn_id,date:date,minor:cents(r.amount),categoryId:r.category_id||'',incomeKind:r.kind||'',note:r.note||'',source:r.source||''};
+      }).filter(function(r){return (!dates || (r.date>=dates[0]&&r.date<=dates[1])) && (!q.categoryId||r.categoryId===q.categoryId) && (!q.incomeKind||r.incomeKind===q.incomeKind) && (q.minMinor===undefined||r.minor>=q.minMinor) && (q.maxMinor===undefined||r.minor<=q.maxMinor) && (!q.text||(r.note+' '+r.source).toLowerCase().indexOf(q.text.toLowerCase())>=0) && (!q.entryId||r.id===q.entryId);});
+    }
+    function total(rows){return rows.reduce(function(s,r){return add(s,r.minor);},0);}
+    var rows=records(q.kind,q.range), result={operation:q.operation,count:rows.length,totalMinor:total(rows),range:q.range,kind:q.kind,rows:[]};
+    if(q.operation==='average') result.averageMinor=rows.length?Math.round(result.totalMinor/rows.length):null;
+    if(['min','max','top','list'].indexOf(q.operation)>=0){
+      rows.sort(function(a,b){return q.operation==='list'?b.date.localeCompare(a.date)||a.id.localeCompare(b.id): (q.operation==='min'?a.minor-b.minor:b.minor-a.minor)||a.id.localeCompare(b.id);});
+      result.rows=rows.slice(0,['min','max'].indexOf(q.operation)>=0?1:(q.limit||5));
+    }
+    if(q.operation==='categories'){
+      var groups={};rows.forEach(function(r){groups[r.categoryId]=add(groups[r.categoryId]||0,r.minor);});
+      result.categories=Object.keys(groups).map(function(id){var c=cats.find(function(c){return c.category_id===id;});return {id:id,name:c?c.name:'Unknown category ('+id+')',minor:groups[id]};}).sort(function(a,b){return b.minor-a.minor||a.id.localeCompare(b.id);});
+    }
+    if(q.operation==='compare'){var previous=records(q.kind,'last_month');result.previousMinor=total(previous);result.previousCount=previous.length;result.differenceMinor=add(result.totalMinor,-result.previousMinor);}
+    if(q.operation==='cashflow'){result.incomeMinor=total(records('income',q.range));result.expenseMinor=total(records('expense',q.range));result.netMinor=add(result.incomeMinor,-result.expenseMinor);}
+    return result;
+  }
+  function interpret(text,snapshot){
+    var t=String(text||'').trim().toLowerCase().replace(/[?!.]+$/,'').replace(/\s+/g,' '), q={action:'query',operation:'sum',kind:'expense',range:'all'};
+    // Deliberately anchored templates: unsupported qualifiers must never be silently discarded.
+    var categoryMatch = /^how much (?:money )?did i spend on (.+?)(?: (this month|last month|this year|today))?$/.exec(t);
+    if(categoryMatch){
+      if(!snapshot) throw new Error('Refresh online once to download categories.');
+      var matches = snapshot.tables.CATEGORIES.map(function(x){return x.record;}).filter(function(c){return !c.deleted_at && c.kind==='SPENDING' && c.name.toLowerCase()===categoryMatch[1];});
+      if(matches.length!==1)throw new Error(matches.length?'More than one category has that name. Please use the ledger filters for now.':'No exact spending category named "'+categoryMatch[1]+'". Use its name from Plan.');
+      q.categoryId=matches[0].category_id; q.range=categoryMatch[2]?categoryMatch[2].replace(/ /g,'_'):'all'; return validate(q);
+    }
+    var patterns=[
+      [/^(?:what(?:'s| is) my |show my )?(biggest|largest|smallest) expense(?: (this month|last month|today))?$/,function(m){q.operation=m[1]==='smallest'?'min':'max';q.range=m[2]?m[2].replace(/ /g,'_'):'all';}],
+      [/^(?:what are my |show my )?top (\d+|five) expenses(?: (this month|last month|this year))?$/,function(m){q.operation='top';q.limit=m[1]==='five'?5:Number(m[1]);q.range=m[2]?m[2].replace(/ /g,'_'):'all';}],
+      [/^(?:how much (?:money )?did i spend|total expenses)(?: (this month|last month|this year|today))?$/,function(m){q.range=m[1]?m[1].replace(/ /g,'_'):'all';}],
+      [/^how much salary did i receive(?: (this month|last month|this year))?$/,function(m){q.kind='income';q.incomeKind='SALARY';q.range=m[1]?m[1].replace(/ /g,'_'):'all';}],
+      [/^compare this month's expenses with last month's$/,function(){q.operation='compare';q.range='this_month';}],
+      [/^(?:which category accounts for most of my spending|spending by category)(?: (this month|last month|this year))?$/,function(m){q.operation='categories';q.range=m[1]?m[1].replace(/ /g,'_'):'all';}],
+      [/^how much money came in versus went out(?: (this month|last month|this year))?$/,function(m){q.operation='cashflow';q.range=m[1]?m[1].replace(/ /g,'_'):'all';}]
+    ];
+    for(var i=0;i<patterns.length;i++){var m=patterns[i][0].exec(t);if(m){patterns[i][1](m);return validate(q);}}
+    throw new Error('I cannot reliably interpret that yet. Try a suggested question. Adding and editing through chat are not enabled.');
+  }
+  root.LedgerQuery={query:query,validate:validate,interpret:interpret,cents:cents,bounds:bounds};
+})(typeof window!=='undefined'?window:globalThis);
+</script>
+
+<script>
 (function(){
   'use strict';
 
@@ -680,7 +787,7 @@
   var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   var TITLES = { home:'Overview', plan:'Plan', add:'Add record', funds:'Funds', loans:'Loans' };
-  var data = null, busy = false, saving = false;
+  var data = null, busy = false, saving = false, ledgerSnapshot = null;
   var localStatus = 'No complete local snapshot yet.';
   function setLocalStatus(message){
     localStatus = message;
@@ -818,11 +925,39 @@
     $('#settingsBody').innerHTML = data && data.setupDone ? settingsHTML(data) : setupCard();
   }
   function showGuide(show){
+    $('#assistantView').hidden = true;
     $('#settingsView').hidden = show; $('#guideView').hidden = !show;
     $('#setTitle').textContent = show ? 'Guide' : 'Settings';
     $('#setClose').setAttribute('aria-label', show ? 'Close guide' : 'Close settings');
     $('#settingsModal .sheet').scrollTop = 0;
     (show ? $('#guideBack') : $('#guideBtn')).focus();
+  }
+  function showAssistant(show){
+    $('#settingsView').hidden = show; $('#guideView').hidden = true; $('#assistantView').hidden = !show;
+    $('#setTitle').textContent = show ? 'Ledger assistant' : 'Settings';
+    $('#setClose').setAttribute('aria-label', show ? 'Close assistant' : 'Close settings');
+    $('#settingsModal .sheet').scrollTop = 0;
+    (show ? $('#assistantInput') : $('#assistantBtn')).focus();
+  }
+  function askLedger(text){
+    var history = $('#chatHistory');
+    function message(label, content){
+      var el = document.createElement('div'); el.className = 'card'; el.style.whiteSpace = 'pre-wrap';
+      el.textContent = label + '\n' + content; history.appendChild(el);
+      while(history.children.length > 40) history.removeChild(history.firstChild);
+      history.scrollTop = history.scrollHeight;
+    }
+    message('You', text);
+    try {
+      var q = LedgerQuery.interpret(text, ledgerSnapshot), r = LedgerQuery.query(ledgerSnapshot, q);
+      function money(n){ return ledgerSnapshot.currency + nf.format(n / 100); }
+      var answer = r.count ? r.count + ' matching ' + r.kind + ' records. Total: ' + money(r.totalMinor) + '.' : 'No matching ' + r.kind + ' records in this range.';
+      if(r.rows.length) answer = r.rows.map(function(row){return row.date + ' · ' + money(row.minor) + ' · ' + (row.note || row.source || row.id) + ' [' + row.id + ']';}).join('\n');
+      if(r.operation === 'compare') answer = 'This month: ' + money(r.totalMinor) + ' (' + r.count + ' records). Last month: ' + money(r.previousMinor) + ' (' + r.previousCount + ' records). Difference: ' + money(r.differenceMinor) + '.';
+      if(r.categories && r.categories.length) answer = r.categories.map(function(c){return c.name + ': ' + money(c.minor);}).join('\n');
+      if(r.operation === 'cashflow') answer = 'Recorded income: ' + money(r.incomeMinor) + '. Budget spending: ' + money(r.expenseMinor) + '. Difference: ' + money(r.netMinor) + '. Fund transfers are excluded; loan payments count only when recorded as spending.';
+      message('Assistant · ' + r.range.replace(/_/g,' ') + ' · snapshot ' + ledgerSnapshot.capturedAt, answer);
+    } catch(e){ message('Assistant', e.message); }
   }
   function openSettings(){
     showGuide(false);
@@ -1138,6 +1273,7 @@
     setLocalStatus('Refreshing complete ledger…');
     return call('getLedgerSnapshot', pin).then(function(snapshot){
       LedgerLocal.validate(snapshot);
+      ledgerSnapshot = snapshot;
       applyState(snapshot.state);
       return LedgerLocal.save(snapshot).then(function(){
         store.del('sl2_cache');
@@ -1159,12 +1295,16 @@
 
   /* ---------- events ---------- */
   document.addEventListener('click', function(e){
+    var suggestion = e.target.closest ? e.target.closest('[data-question]') : null;
+    if(suggestion){ askLedger(suggestion.getAttribute('data-question')); return; }
     var t = e.target.closest ? e.target.closest('[data-tab],[data-act]') : null;
     if (!t) return;
     if (t.hasAttribute('data-tab')) { showTab(t.getAttribute('data-tab')); return; }
     var act = t.getAttribute('data-act'), id = t.getAttribute('data-id');
     if (act === 'opensettings') openSettings();
     else if (act === 'closesettings') closeSettings();
+    else if (act === 'openassistant') showAssistant(true);
+    else if (act === 'backassistant') showAssistant(false);
     else if (act === 'openguide') showGuide(true);
     else if (act === 'backsettings') showGuide(false);
     else if (act === 'addtype') { addType = t.getAttribute('data-v'); delete cids.add; fillAdd(); if (addType === 'Loan') prefillLoan(); }
@@ -1202,6 +1342,7 @@
       mutate('generatePeriods', [y], function(res, err){ toast(err || 'Pay periods for ' + y + ' are ready.', !!err); });
     }
   });
+  $('#assistantForm').addEventListener('submit', function(e){ e.preventDefault(); var input = $('#assistantInput'); var text = input.value.trim(); if(text){askLedger(text); input.value = ''; input.focus();} });
   $('#refresh').addEventListener('click', load);
   $('#settingsModal').addEventListener('click', function(e){ if (e.target === this) closeSettings(); });
   document.addEventListener('keydown', function(e){
@@ -1234,7 +1375,7 @@
   showTab(tab, true);
   LedgerLocal.restore().then(function(snapshot){
     if (snapshot) {
-      data = snapshot.state; render();
+      ledgerSnapshot = snapshot; data = snapshot.state; render();
       setLocalStatus('Showing cached ledger from ' + snapshot.capturedAt + '.');
     }
   }).catch(function(){
