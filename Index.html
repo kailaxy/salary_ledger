@@ -496,6 +496,7 @@
         </button>
       </div>
       <div id="settingsView">
+        <p id="localStatus" role="status" style="font-size:13px;line-height:1.5"></p>
         <div id="settingsBody"></div>
         <div class="guide-nav"><button class="btn2" id="guideBtn" type="button" data-act="openguide">Guide</button></div>
       </div>
@@ -585,6 +586,77 @@
 </div>
 
 <script>
+/* Durable full-snapshot storage. No credentials are stored here. */
+(function(root){
+  'use strict';
+  var connection;
+  function open(){
+    if (connection) return connection;
+    connection = new Promise(function(resolve, reject){
+      if (!root.indexedDB) { reject(new Error('IndexedDB is unavailable.')); return; }
+      var request = root.indexedDB.open('salary-ledger-offline', 1);
+      request.onupgradeneeded = function(){
+        var db = request.result;
+        db.createObjectStore('snapshots', {keyPath:'ledgerId'});
+        db.createObjectStore('metadata');
+        // Reserved for the next increment; no offline writes are accepted yet.
+        db.createObjectStore('outbox', {keyPath:'mutationId'});
+      };
+      request.onerror = function(){ connection = null; reject(request.error); };
+      request.onblocked = function(){ connection = null; reject(new Error('Close other app windows to update local storage.')); };
+      request.onsuccess = function(){
+        var db = request.result;
+        db.onversionchange = function(){ db.close(); connection = null; };
+        resolve(db);
+      };
+    });
+    return connection;
+  }
+  function validate(snapshot){
+    var names = ['SETTINGS','PAY_PERIODS','INCOME','CATEGORIES','FUND_GOALS','BUDGET_LINES','TRANSACTIONS','LOANS','LOAN_INSTALLMENTS','LOAN_PAYMENTS'];
+    if (!snapshot || snapshot.formatVersion !== 1 || typeof snapshot.ledgerId !== 'string' || !snapshot.ledgerId ||
+        !snapshot.tables || !snapshot.state || snapshot.state.setupDone !== true ||
+        !Number.isFinite(Date.parse(snapshot.capturedAt)) || typeof snapshot.currency !== 'string' ||
+        snapshot.minorUnitScale !== 2 || typeof snapshot.timezone !== 'string') throw new Error('Invalid ledger snapshot.');
+    names.forEach(function(name){
+      if (!Array.isArray(snapshot.tables[name])) throw new Error('Incomplete ledger snapshot: ' + name);
+      snapshot.tables[name].forEach(function(item){
+        if (!item || !item.record || typeof item.record !== 'object' || !/^[a-f0-9]{64}$/.test(item.fingerprint))
+          throw new Error('Invalid record in ' + name);
+      });
+    });
+    return snapshot;
+  }
+  function save(snapshot){
+    try { validate(snapshot); } catch(e){ return Promise.reject(e); }
+    return open().then(function(db){ return new Promise(function(resolve,reject){
+      var tx = db.transaction(['snapshots','metadata'], 'readwrite');
+      tx.objectStore('snapshots').put(snapshot);
+      tx.objectStore('metadata').put(snapshot.ledgerId, 'activeLedger');
+      tx.oncomplete = function(){ resolve(snapshot); };
+      tx.onabort = tx.onerror = function(){ reject(tx.error || new Error('Local snapshot was not saved.')); };
+    }); });
+  }
+  function restore(){
+    return open().then(function(db){ return new Promise(function(resolve,reject){
+      var tx = db.transaction(['snapshots','metadata'], 'readonly'), snapshot = null;
+      var key = tx.objectStore('metadata').get('activeLedger');
+      key.onsuccess = function(){
+        if (!key.result) return;
+        var request = tx.objectStore('snapshots').get(key.result);
+        request.onsuccess = function(){ snapshot = request.result || null; };
+      };
+      tx.oncomplete = function(){
+        try { resolve(snapshot ? validate(snapshot) : null); } catch(e){ reject(e); }
+      };
+      tx.onabort = tx.onerror = function(){ reject(tx.error || new Error('Local snapshot could not be read.')); };
+    }); });
+  }
+  root.LedgerLocal = {save:save, restore:restore, validate:validate};
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+
+<script>
 (function(){
   'use strict';
 
@@ -609,6 +681,11 @@
 
   var TITLES = { home:'Overview', plan:'Plan', add:'Add record', funds:'Funds', loans:'Loans' };
   var data = null, busy = false, saving = false;
+  var localStatus = 'No complete local snapshot yet.';
+  function setLocalStatus(message){
+    localStatus = message;
+    var el = $('#localStatus'); if (el) el.textContent = message;
+  }
   var tab = store.get('sl2_tab'); if (!TITLES[tab]) tab = 'home';
   var pin = store.get('sl2_pin') || '';
   var planPer = null, addType = 'Expense', armed = null, armTimer = null, cids = {}, toastTimer = null;
@@ -639,12 +716,12 @@
     return 'Couldn’t save. Check your connection and tap again. It won’t double-record.';
   }
   function applyState(s){
-    data = s; store.set('sl2_cache', JSON.stringify(s)); hideBanner(); hideLock(); render();
+    data = s; hideBanner(); hideLock(); render();
   }
   /* one write: done(result|null, errorText) */
   function mutate(fn, args, done){
     if (saving) return; saving = true;
-    call.apply(null, [fn, pin].concat(args)).then(function(res){ applyState(res.state); return { res: res }; },
+    call.apply(null, [fn, pin].concat(args)).then(function(res){ applyState(res.state); setLocalStatus('Cloud save completed. Refresh to update the full local snapshot.'); return { res: res }; },
       function(err){ return { err: errText(err) }; })
     .then(function(o){ saving = false; if (done) done(o.res || null, o.err || ''); })
     .catch(function(e){ saving = false; if (window.console) console.error(e); toast('Something went wrong showing the result. Pull to refresh.', true); });
@@ -737,6 +814,7 @@
   var settingsOpen = false;
   function fillSettings(){
     if (!settingsOpen) return;
+    setLocalStatus(localStatus);
     $('#settingsBody').innerHTML = data && data.setupDone ? settingsHTML(data) : setupCard();
   }
   function showGuide(show){
@@ -1057,11 +1135,24 @@
   function load(){
     if (busy) return Promise.resolve();
     busy = true; $('#refresh').classList.add('spin');
-    return call('getState', pin).then(function(d){ applyState(d); }).catch(function(err){
+    setLocalStatus('Refreshing complete ledger…');
+    return call('getLedgerSnapshot', pin).then(function(snapshot){
+      LedgerLocal.validate(snapshot);
+      applyState(snapshot.state);
+      return LedgerLocal.save(snapshot).then(function(){
+        store.del('sl2_cache');
+        setLocalStatus('Full ledger cached · ' + snapshot.capturedAt + '. Offline writes are not enabled yet.');
+      }, function(){
+        setLocalStatus('Cloud data loaded, but local storage failed. This data is not saved for offline use.');
+        showBanner('Could not save the local ledger. Check available storage and refresh.');
+      });
+    }).catch(function(err){
+      setLocalStatus('Refresh failed. Any cached data may be out of date; offline writes are not enabled yet.');
       var m = String((err && err.message) || err);
       if (/BAD_PIN/.test(m)) { pin = ''; store.del('sl2_pin'); showLock('That PIN isn’t right.'); }
       else if (/PIN_REQUIRED/.test(m)) showLock('');
       else if (/LOCKED/.test(m)) showLock('Too many wrong tries. Wait 10 minutes, then try again.');
+      else if (/PIN_NOT_SET/.test(m)) showBanner('Set a PIN in the sheet before downloading a complete local ledger.');
       else showBanner(data ? 'Couldn’t refresh. Showing the last data you loaded.' : 'Couldn’t load your sheet. ' + m);
     }).then(function(){ busy = false; $('#refresh').classList.remove('spin'); });
   }
@@ -1139,10 +1230,17 @@
   });
 
   /* ---------- boot ---------- */
-  try { var c0 = JSON.parse(store.get('sl2_cache') || 'null'); if (c0 && c0.setupDone) data = c0; } catch(e){}
   render();
   showTab(tab, true);
-  load();
+  LedgerLocal.restore().then(function(snapshot){
+    if (snapshot) {
+      data = snapshot.state; render();
+      setLocalStatus('Showing cached ledger from ' + snapshot.capturedAt + '.');
+    }
+  }).catch(function(){
+    setLocalStatus('Local storage is unavailable. Cloud access still requires connectivity.');
+  }).then(load);
+
 })();
 </script>
 </body>

@@ -330,6 +330,34 @@ function getState(pin) {
   }
 }
 
+/** Complete read-only snapshot for local storage; never use the 40-row recent list as a ledger. */
+function getLedgerSnapshot(pin) {
+  // Offline exports always require a configured, valid PIN, including first setup.
+  requirePinForWrite_(pin);
+  return withLock_(function () {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    TZ_ = ss.getSpreadsheetTimeZone();
+    const now = new Date(), settings = getSettings_(ss), tables = {};
+    Object.keys(TABLES).forEach(function (name) {
+      tables[name] = readTable_(ss, name, true).map(function (row) {
+        const record = {};
+        colsOf_(name).forEach(function (col) { record[col] = row[col]; });
+        // Hash content, not updated_at alone: direct Sheet edits may leave timestamps unchanged.
+        const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,
+          JSON.stringify(colsOf_(name).map(function (col) { return record[col]; })), Utilities.Charset.UTF_8);
+        return { record: record, fingerprint: bytes.map(function (b) {
+          return ('0' + ((b + 256) % 256).toString(16)).slice(-2);
+        }).join('') };
+      });
+    });
+    return {
+      formatVersion: 1, ledgerId: ss.getId(), capturedAt: now.toISOString(),
+      timezone: TZ_, currency: settings.currency || '₱', minorUnitScale: 2,
+      tables: tables, state: buildState_(ss, now)
+    };
+  });
+}
+
 function buildState_(ss, now) {
   const today = todayIso_(now);
   const set = getSettings_(ss);

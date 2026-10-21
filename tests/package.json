@@ -1,0 +1,6 @@
+{
+  "name": "salary-ledger-tests",
+  "private": true,
+  "scripts": { "test": "node --test snapshot.test.cjs" },
+  "devDependencies": { "fake-indexeddb": "6.2.4" }
+}
