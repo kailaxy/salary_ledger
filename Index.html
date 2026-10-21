@@ -632,7 +632,7 @@
           <li><strong>Income</strong>: salary, bonus or other, with an optional source such as your employer. You can enter more than one per pay period.</li>
           <li><strong>Loan pay</strong>: choose the loan; the amount is filled in with the next installment. Leave <strong>Also count it as spending</strong> ticked if the payment should reduce your budget in a category (for example, Loan Payment).</li>
           </ul>
-          <p>Recent entries appear below the form. To remove one, tap <strong>Delete</strong> and then <strong>Sure?</strong>. For income and ordinary expenses, tap Edit, change the fields, and review before saving. Fund deposits and withdrawals can also be saved offline after the updated server is deployed and cached. Review the direction, fund and amount before saving. Withdrawals cannot exceed the cached balance; a changed cloud balance may require conflict review. Fund editing and loan payments still use the online workflow.</p>
+          <p>Recent entries appear below the form. To remove one, tap <strong>Delete</strong> and then <strong>Sure?</strong>. For income and ordinary expenses, tap Edit, change the fields, and review before saving. Fund deposits and withdrawals can also be saved offline after the updated server is deployed and cached. Review the direction, fund and amount before saving. Withdrawals cannot exceed the cached balance; a changed cloud balance may require conflict review. Loan payments can also be saved offline after the updated server is deployed and cached. Review the loan, amount still owed, and whether to count the payment as spending. Each loan can have one pending payment; synchronize or resolve it before recording another. Loan balances and optional spending update together. Creating or editing a loan, editing funds, and deletion require internet.</p>
           <h4>Funds</h4>
           <p>Every fund with its balance, progress toward its target, how far you have to go, and whether you are on track against your plan so far. <strong>New fund</strong> starts a fund from here.</p>
           <h4>Loans</h4>
@@ -825,10 +825,11 @@
         entry.status='conflict';entry.error='Cloud record changed. Review before resolving.';entry.conflict=receipt;tx.objectStore('outbox').put(entry);done(true);return;
       }
       if(!receipt.record||receipt.record[root.LedgerPending.key(entry.payload.table)]!==entry.payload.recordId||!/^[a-f0-9]{64}$/.test(receipt.fingerprint)||!Number.isFinite(Date.parse(receipt.committedAt)))throw new Error('Invalid committed receipt.');
+      if(entry.payload.table==='LOAN_PAYMENTS')root.LedgerPending.validateLoanReceipt(entry,receipt);
       var base=tx.objectStore('snapshots').get(ledgerId);base.onsuccess=function(){try{
         if(!base.result)throw new Error('The local ledger base is missing.');
         var snapshot=base.result;
-        if(snapshot.capturedAt<=receipt.committedAt)root.LedgerPending.applyRecord(snapshot,entry.payload.table,receipt.record,receipt.fingerprint);
+        if(snapshot.capturedAt<=receipt.committedAt){if(entry.payload.table==='LOAN_PAYMENTS')root.LedgerPending.applyLoanReceipt(snapshot,entry,receipt);else root.LedgerPending.applyRecord(snapshot,entry.payload.table,receipt.record,receipt.fingerprint);}
         if(!snapshot.lastAcknowledgedAt||snapshot.lastAcknowledgedAt<receipt.committedAt)snapshot.lastAcknowledgedAt=receipt.committedAt;
         tx.objectStore('snapshots').put(snapshot);
         var all=tx.objectStore('outbox').getAll();all.onsuccess=function(){
@@ -959,7 +960,7 @@
 (function(root){
   'use strict';
   function clone(value){return JSON.parse(JSON.stringify(value));}
-  function key(table){return table==='INCOME'?'income_id':'txn_id';}
+  function key(table){return table==='INCOME'?'income_id':table==='LOAN_PAYMENTS'?'payment_id':table==='LOANS'?'loan_id':'txn_id';}
   function same(entry,table,id){return entry.payload.table===table&&entry.payload.recordId===id;}
   function order(entries){return entries.slice().sort(function(a,b){return a.sequence-b.sequence||a.mutationId.localeCompare(b.mutationId);});}
   function revision(snapshot,entries,table,id){
@@ -967,7 +968,83 @@
     return (found?found.fingerprint:'new')+'|'+order(entries.filter(function(e){return same(e,table,id);})).map(function(e){return e.mutationId;}).join('|');
   }
   function round(n){return Math.round((n+Number.EPSILON)*100)/100;}
+  function loanContext(snapshot,loanId){
+    var found=snapshot.tables.LOANS.find(function(x){return !x.record.deleted_at&&x.record.loan_id===loanId;});
+    if(!found)return null;
+    var paid=snapshot.tables.LOAN_PAYMENTS.filter(function(x){return !x.record.deleted_at&&x.record.loan_id===loanId;}).reduce(function(n,x){return n+Math.round(x.record.amount*100);},0);
+    return {loan:found.record,fingerprint:found.fingerprint,paidMinor:paid,schedule:snapshot.tables.LOAN_INSTALLMENTS.filter(function(x){return !x.record.deleted_at&&x.record.loan_id===loanId;}).map(function(x){return x.record.installment_id+':'+x.fingerprint;}).sort()};
+  }
+  function loanRevision(snapshot,entries,loanId){
+    var context=loanContext(snapshot,loanId);
+    return JSON.stringify([context&&context.fingerprint,context&&context.paidMinor,context&&context.schedule,order(entries.filter(function(e){return e.payload.table==='LOAN_PAYMENTS'&&e.payload.values.loanId===loanId;})).map(function(e){return e.mutationId;})]);
+  }
+  function loanState(snapshot,loanId){
+    var context=loanContext(snapshot,loanId);if(!context)return null;
+    var l=context.loan, paid=context.paidMinor,pool=paid,today=snapshot.state.today||'0000-00-00';
+    var items=snapshot.tables.LOAN_INSTALLMENTS.filter(function(x){return !x.record.deleted_at&&x.record.loan_id===loanId;}).map(function(x){return x.record;}).sort(function(a,b){return a.seq_no-b.seq_no;}).map(function(i){
+      var due=Math.round(i.amount_due*100),covered=Math.min(pool,due);pool-=covered;var left=due-covered;
+      return {id:i.installment_id,seq:i.seq_no,due:i.due_date,amount:due/100,covered:covered/100,left:left/100,status:left===0?'PAID':i.due_date<today?'OVERDUE':covered>0?'PARTIAL':'UPCOMING'};
+    });
+    var remaining=Math.max(0,Math.round(l.total_payable*100)-paid);
+    return {id:l.loan_id,name:l.name,lender:l.lender,principal:l.principal,total:l.total_payable,firstDue:l.start_date,frequency:l.frequency,count:l.installment_count,installment:l.installment_amount,
+      status:remaining===0?'PAID':'ACTIVE',paid:paid/100,remaining:remaining/100,pct:l.total_payable?Math.min(100,paid/l.total_payable):0,installments:items,next:items.find(function(i){return i.status!=='PAID';})||null,
+      overdue:items.filter(function(i){return i.status==='OVERDUE';}).length,paymentsLeft:items.filter(function(i){return i.status!=='PAID';}).length,
+      payments:snapshot.tables.LOAN_PAYMENTS.filter(function(x){return !x.record.deleted_at&&x.record.loan_id===loanId;}).map(function(x){var p=x.record;return {id:p.payment_id,date:p.paid_date,amount:p.amount,note:p.note,counted:!!p.txn_id};}).sort(function(a,b){return b.date.localeCompare(a.date);})};
+  }
+  function putRow(snapshot,table,record,fingerprint){
+    var rows=snapshot.tables[table],id=record[key(table)],index=rows.findIndex(function(x){return x.record[key(table)]===id;}),item={record:clone(record),fingerprint:fingerprint};
+    if(index<0)rows.push(item);else rows[index]=item;
+  }
+  function applyPayment(snapshot,record,fingerprint,expense){
+    var payment=clone(record);delete payment._expense;
+    if(expense)applyRecord(snapshot,'TRANSACTIONS',expense.record,expense.fingerprint);
+    putRow(snapshot,'LOAN_PAYMENTS',payment,fingerprint);
+    var d=snapshot.state,loan=loanState(snapshot,payment.loan_id),i=d.loans.findIndex(function(l){return l.id===payment.loan_id;});
+    if(loan){if(i<0)d.loans.push(loan);else d.loans[i]=loan;}
+    d.summary.loanRemaining=round(d.loans.reduce(function(n,l){return n+l.remaining;},0));
+    d.recent=d.recent.filter(function(r){return !(r.kind==='loanpay'&&r.id===payment.payment_id)&&!(payment.txn_id&&r.kind==='txn'&&r.id===payment.txn_id);});
+    if(!payment.deleted_at)d.recent.push({kind:'loanpay',id:payment.payment_id,date:payment.paid_date,at:payment.created_at,title:loan?loan.name:'Loan payment',amount:payment.amount,dir:'out',sub:['Loan payment',payment.txn_id?'also counted as spending':'',payment.note].filter(Boolean).join(' · ')});
+    d.recent.sort(function(a,b){return (b.at||'').localeCompare(a.at||'')||b.date.localeCompare(a.date);});d.recent=d.recent.slice(0,40);return snapshot;
+  }
+  function paymentAfter(snapshot,payload,createdAt){
+    var v=payload.values,loan=loanState(snapshot,v.loanId),txnId=v.alsoSpend?'txn_'+payload.recordId.slice(4):'';
+    var payment={payment_id:payload.recordId,loan_id:v.loanId,installment_id:loan&&loan.next?loan.next.id:'',txn_id:txnId,paid_date:v.date,amount:v.amountMinor/100,note:v.note.trim(),created_at:createdAt,updated_at:createdAt,deleted_at:''};
+    if(v.alsoSpend)payment._expense={record:{txn_id:txnId,period_id:v.periodId,category_id:v.categoryId,type:'EXPENSE',txn_date:v.date,amount:v.amountMinor/100,note:v.note.trim()||('Loan: '+(loan?loan.name:'')),created_at:createdAt,updated_at:createdAt,deleted_at:''},fingerprint:'0'.repeat(64)};
+    return payment;
+  }
+  function validateLoan(snapshot,entries,input,expectedRevision){
+    if(!snapshot.capabilities||snapshot.capabilities.recordSyncVersion!==1||snapshot.capabilities.loanSyncVersion!==1)throw new Error('Update Apps Script with LoanSync.gs and refresh online to enable offline loan payments.');
+    if(input.version!==1||input.ledgerId!==snapshot.ledgerId||input.table!=='LOAN_PAYMENTS'||input.operation!=='add'||Object.keys(input).some(function(k){return ['version','ledgerId','mutationId','operation','table','recordId','baseFingerprint','values'].indexOf(k)<0;}))throw new Error('Unsupported loan payment.');
+    if(typeof input.mutationId!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_-]{15,79}$/.test(input.mutationId)||typeof input.recordId!=='string'||!/^pay_[A-Za-z0-9_-]{4,76}$/.test(input.recordId))throw new Error('Invalid stable payment ID.');
+    var v=input.values,fields=['loanId','date','amountMinor','note','alsoSpend','periodId','categoryId','expectedPaidMinor','schedule'];
+    if(!v||typeof v!=='object'||Array.isArray(v)||fields.some(function(k){return v[k]===undefined;})||Object.keys(v).some(function(k){return fields.indexOf(k)<0;}))throw new Error('Invalid payment fields.');
+    if(typeof v.loanId!=='string'||!v.loanId||v.loanId.length>80||typeof v.alsoSpend!=='boolean'||typeof v.periodId!=='string'||v.periodId.length>80||typeof v.categoryId!=='string'||v.categoryId.length>80||(!v.alsoSpend&&(v.periodId||v.categoryId)))throw new Error('Invalid loan or spending references.');
+    if(!Number.isSafeInteger(v.amountMinor)||v.amountMinor<=0||v.amountMinor>1000000000||!Number.isSafeInteger(v.expectedPaidMinor)||v.expectedPaidMinor<0)throw new Error('Enter a positive payment with at most two decimals.');
+    if(typeof v.note!=='string'||v.note.length>200||/^[=+@-]/.test(v.note.trim())||/[\u0000-\u001f\u007f]/.test(v.note))throw new Error('Invalid payment note.');
+    var date=typeof v.date==='string'?new Date(v.date+'T00:00:00Z'):new Date(NaN);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(v.date)||isNaN(date)||date.getUTCFullYear()<2000||date.getUTCFullYear()>2100||date.toISOString().slice(0,10)!==v.date)throw new Error('Enter a valid calendar date.');
+    var context=loanContext(snapshot,v.loanId);
+    if(expectedRevision!==loanRevision(snapshot,entries,v.loanId)||!context||input.baseFingerprint!==context.fingerprint||v.expectedPaidMinor!==context.paidMinor||JSON.stringify(v.schedule)!==JSON.stringify(context.schedule))throw new Error('This loan changed while you were reviewing it. Reopen and confirm again.');
+    if(entries.some(function(e){return e.payload.table==='LOAN_PAYMENTS'&&e.payload.values.loanId===v.loanId;}))throw new Error('This loan already has a pending payment. Synchronize or resolve it before adding another.');
+    if(v.amountMinor>Math.round(context.loan.total_payable*100)-context.paidMinor)throw new Error('Payment exceeds the amount still owed.');
+    if(snapshot.tables.LOAN_PAYMENTS.some(function(x){return x.record.payment_id===input.recordId;})||snapshot.tables.TRANSACTIONS.some(function(x){return x.record.txn_id==='txn_'+input.recordId.slice(4);}))throw new Error('This payment ID already exists.');
+    if(v.alsoSpend){
+      if(!snapshot.tables.PAY_PERIODS.some(function(x){return !x.record.deleted_at&&x.record.period_id===v.periodId;}))throw new Error('Choose an available pay period.');
+      if(!snapshot.tables.CATEGORIES.some(function(x){var c=x.record;return !c.deleted_at&&!c.is_archived&&c.kind==='SPENDING'&&c.category_id===v.categoryId;}))throw new Error('Choose an active spending category.');
+    }
+    return paymentAfter(snapshot,input,new Date().toISOString());
+  }
+  function validateLoanReceipt(entry,receipt){
+    var v=entry.payload.values,r=receipt.record,expense=receipt.expense,loan=receipt.loan,txnId=v.alsoSpend?'txn_'+entry.payload.recordId.slice(4):'';
+    if(r.loan_id!==v.loanId||r.amount!==v.amountMinor/100||r.paid_date!==v.date||r.txn_id!==txnId||r.deleted_at||!loan||!loan.record||loan.record.loan_id!==v.loanId||!/^[a-f0-9]{64}$/.test(loan.fingerprint)||
+      (v.alsoSpend?(!expense||!expense.record||expense.record.txn_id!==txnId||expense.record.type!=='EXPENSE'||expense.record.amount!==r.amount||expense.record.txn_date!==v.date||expense.record.category_id!==v.categoryId||expense.record.period_id!==v.periodId||expense.record.deleted_at||!/^[a-f0-9]{64}$/.test(expense.fingerprint)):!!expense))throw new Error('Invalid complete loan payment receipt.');
+  }
+  function applyLoanReceipt(snapshot,entry,receipt){
+    validateLoanReceipt(entry,receipt);putRow(snapshot,'LOANS',receipt.loan.record,receipt.loan.fingerprint);
+    return applyPayment(snapshot,receipt.record,receipt.fingerprint,receipt.expense);
+  }
   function applyRecord(snapshot,table,record,fingerprint){
+    if(table==='LOAN_PAYMENTS')return applyPayment(snapshot,record,fingerprint,record._expense);
     var id=record[key(table)], rows=snapshot.tables[table], index=rows.findIndex(function(x){return x.record[key(table)]===id;}), before=index>=0?rows[index].record:null;
     if(index>=0)rows[index]={record:clone(record),fingerprint:fingerprint};else rows.push({record:clone(record),fingerprint:fingerprint});
     var d=snapshot.state, isIncome=table==='INCOME';
@@ -995,6 +1072,7 @@
     return snapshot;
   }
   function after(snapshot,payload,createdAt){
+    if(payload.table==='LOAN_PAYMENTS')return paymentAfter(snapshot,payload,createdAt);
     var table=payload.table, found=snapshot.tables[table].find(function(x){return x.record[key(table)]===payload.recordId;}), r=found?clone(found.record):{};
     r[key(table)]=payload.recordId;if(!found){r.created_at=createdAt;r.deleted_at='';if(table==='TRANSACTIONS')r.type='EXPENSE';}
     r.updated_at=createdAt;
@@ -1009,12 +1087,13 @@
       if(relevant.some(function(other){return other.status==='conflict'&&same(other,e.payload.table,e.payload.recordId);}))return;
       var existing=result.tables[e.payload.table].find(function(x){return x.record[key(e.payload.table)]===e.payload.recordId;});
       if(e.payload.operation==='edit'&&(!existing||existing.record.deleted_at||(e.payload.table==='TRANSACTIONS'&&existing.record.type!=='EXPENSE')))return;
-      var record=after(result,e.payload,e.createdAt), item=result.tables[e.payload.table].find(function(x){return x.record[key(e.payload.table)]===e.payload.recordId;});
+      var record=e.payload.table==='LOAN_PAYMENTS'?clone(e.proposalRecord):after(result,e.payload,e.createdAt), item=result.tables[e.payload.table].find(function(x){return x.record[key(e.payload.table)]===e.payload.recordId;});
       applyRecord(result,e.payload.table,record,item?item.fingerprint:'0'.repeat(64));
     });
     return result;
   }
   function validate(snapshot,entries,input,expectedRevision){
+    if(input&&input.table==='LOAN_PAYMENTS')return validateLoan(snapshot,entries,input,expectedRevision);
     if(!snapshot.capabilities||snapshot.capabilities.recordSyncVersion!==1)throw new Error('Update Apps Script, prepare reliable sync, and refresh online before enabling offline entries.');
     if(!input||input.version!==1||input.ledgerId!==snapshot.ledgerId||['INCOME','TRANSACTIONS'].indexOf(input.table)<0||['add','edit'].indexOf(input.operation)<0)throw new Error('Unsupported local mutation.');
     if(Object.keys(input).some(function(k){return ['version','ledgerId','mutationId','operation','table','recordId','baseFingerprint','values'].indexOf(k)<0;}))throw new Error('Unsupported mutation fields.');
@@ -1050,7 +1129,7 @@
     }
     return record;
   }
-  root.LedgerPending={project:project,validate:validate,revision:revision,applyRecord:applyRecord,order:order,key:key,clone:clone};
+  root.LedgerPending={loanContext:loanContext,loanRevision:loanRevision,validateLoanReceipt:validateLoanReceipt,applyLoanReceipt:applyLoanReceipt,project:project,validate:validate,revision:revision,applyRecord:applyRecord,order:order,key:key,clone:clone};
 })(typeof window!=='undefined'?window:globalThis);
 </script>
 
@@ -1151,6 +1230,7 @@
   }
   function periodPairs(){ return data.periods.map(function(p){ return [p.id, perLabel(p)]; }); }
   function delBtn(kind, id, label){
+    if(kind==='loanpay'&&pendingEntries&&pendingEntries.some(function(e){return e.payload.table==='LOAN_PAYMENTS'&&e.payload.recordId===id;}))return '<span class="pending-tag">Pending sync</span>';
     var key = kind + ':' + id, on = armed === key;
     return '<button type="button" class="del' + (on ? ' armed' : '') + '" data-act="del" data-kind="' + kind + '" data-id="' + esc(id) + '" aria-label="Delete ' + esc(label) + '">' + (on ? 'Sure?' : 'Delete') + '</button>';
   }
@@ -1422,14 +1502,14 @@
     body.textContent='';
     pendingEntries.forEach(function(entry){
       var row=document.createElement('div');row.className='pending-item';
-      var title=document.createElement('p');title.className='row-name';title.textContent=(entry.payload.operation==='add'?'New ':'Edited ')+(entry.payload.table==='INCOME'?'income':entry.payload.values.type==='FUND_IN'?'fund deposit':entry.payload.values.type==='FUND_OUT'?'fund withdrawal':'expense')+' · '+entry.payload.recordId;
-      var note=document.createElement('p');note.className='sub';note.textContent=entry.status==='conflict'?'Cloud data or available fund balance changed. Your proposal is preserved.':entry.dependsOn?'Waiting for an earlier change to this record.':entry.error||'Saved on this device. Waiting to synchronize.';
+      var title=document.createElement('p');title.className='row-name';title.textContent=(entry.payload.operation==='add'?'New ':'Edited ')+(entry.payload.table==='INCOME'?'income':entry.payload.table==='LOAN_PAYMENTS'?'loan payment':entry.payload.values.type==='FUND_IN'?'fund deposit':entry.payload.values.type==='FUND_OUT'?'fund withdrawal':'expense')+' · '+entry.payload.recordId;
+      var note=document.createElement('p');note.className='sub';note.textContent=entry.status==='conflict'?entry.payload.table==='LOAN_PAYMENTS'?'The loan changed in the cloud. Your payment proposal is preserved.':'Cloud data or available fund balance changed. Your proposal is preserved.':entry.dependsOn?'Waiting for an earlier change to this record.':entry.error||'Saved on this device. Waiting to synchronize.';
       row.appendChild(title);row.appendChild(note);
       if(entry.status==='conflict'){
         var values=document.createElement('p');values.className='sub';
         var proposals=LedgerPending.order(pendingEntries.filter(function(e){return e.payload.table===entry.payload.table&&e.payload.recordId===entry.payload.recordId;}));
         var proposed=proposals.length?proposals[proposals.length-1].proposalRecord:null;
-        values.textContent='Your amount: '+(proposed?ledgerSnapshot.currency+nf.format(proposed.amount):'unavailable')+' · Cloud amount: '+(entry.conflict.remote?ledgerSnapshot.currency+nf.format(entry.conflict.remote.amount):'record missing');
+        values.textContent='Your amount: '+(proposed?ledgerSnapshot.currency+nf.format(proposed.amount):'unavailable')+(entry.payload.table==='LOAN_PAYMENTS'?' · Not applied to the cloud loan.':' · Cloud amount: '+(entry.conflict.remote?ledgerSnapshot.currency+nf.format(entry.conflict.remote.amount):'record missing'));
         var button=document.createElement('button');button.type='button';button.className='btn2';button.dataset.act='resolvecloud';button.dataset.id=entry.mutationId;button.textContent='Review cloud version';row.appendChild(values);row.appendChild(button);
       }
       body.appendChild(row);
@@ -1446,7 +1526,7 @@
         var all=await LedgerLocal.list(ledgerId), next=all.find(function(e){return e.status==='pending'&&!e.dependsOn;});
         if(!next)break;
         try{
-          var receipt=await call('syncLedgerMutation',pin,next.payload);
+          var receipt=await call(next.payload.table==='LOAN_PAYMENTS'?'syncLoanPayment':'syncLedgerMutation',pin,next.payload);
           await LedgerLocal.acknowledge(ledgerId,next.mutationId,receipt);
         }catch(error){
           var message=String(error&&error.message||error);
@@ -1461,6 +1541,7 @@
   var reviewResolver=null,reviewFocus=null;
   function recordDescription(record,table){
     if(!record)return 'No existing record';
+    if(table==='LOAN_PAYMENTS'){var loan=byId(data.loans,record.loan_id),expense=record._expense;return ['Loan: '+(loan?loan.name:record.loan_id),'Payment: '+ledgerSnapshot.currency+nf.format(record.amount),'Date: '+record.paid_date,'Count as spending: '+(record.txn_id?'Yes':'No'),expense?recordDescription(expense.record,'TRANSACTIONS'):'','Note: '+(record.note||'None')].filter(Boolean).join('\n');}
     var income=table==='INCOME',cat=ledgerSnapshot.tables.CATEGORIES.find(function(x){return x.record.category_id===record.category_id;}),p=byId(data.periods,record.period_id);
     return ['Amount: '+ledgerSnapshot.currency+nf.format(record.amount),'Date: '+(income?record.received_date:record.txn_date),'Pay period: '+(p?p.label:record.period_id),income?'Income type: '+record.kind:'Category: '+(cat?cat.record.name:record.category_id),income?'Source: '+(record.source||'None'):'Type: '+(record.type==='FUND_IN'?'Deposit to fund':record.type==='FUND_OUT'?'Withdraw from fund':'Expense'), 'Note: '+(record.note||'None')].filter(Boolean).join('\n');
   }
@@ -1489,6 +1570,31 @@
     if(table==='INCOME'){$('#fKind').value=r.kind;$('#fSource').value=r.source||'';}else $('#fCat').value=r.category_id;
     setMsg('addMsg','Editing '+id+'. Changes will be reviewed before saving.');
   }
+  async function submitLoanLocal(rec){
+    if(!cloudSnapshot)throw new Error('Refresh online once before saving offline payments.');
+    if(!pin){showLock('Unlock before saving a payment.');return false;}
+    var context=LedgerPending.loanContext(cloudSnapshot,rec.loanId);
+    if(!context)throw new Error('Choose an available loan.');
+    var payload={version:1,ledgerId:cloudSnapshot.ledgerId,mutationId:newLocalId('req_'),operation:'add',table:'LOAN_PAYMENTS',recordId:newLocalId('pay_'),baseFingerprint:context.fingerprint,
+      values:{loanId:rec.loanId,date:rec.date,amountMinor:LedgerQuery.cents($('#fAmount').value.replace(/[,\s₱]/g,'')),note:rec.note.replace(/\s+/g,' ').trim(),alsoSpend:rec.alsoSpend,periodId:rec.alsoSpend?rec.periodId:'',categoryId:rec.alsoSpend?rec.categoryId:'',expectedPaidMinor:context.paidMinor,schedule:context.schedule}};
+    var revision=LedgerPending.loanRevision(cloudSnapshot,pendingEntries,rec.loanId),after=LedgerPending.validate(cloudSnapshot,pendingEntries,payload,revision);
+    var before='Owed before: '+ledgerSnapshot.currency+nf.format(context.loan.total_payable-context.paidMinor/100);
+    var remaining='Owed after: '+ledgerSnapshot.currency+nf.format(context.loan.total_payable-(context.paidMinor+payload.values.amountMinor)/100);
+    if(!await reviewChange('Review loan payment',before,recordDescription(after,'LOAN_PAYMENTS')+'\n'+remaining))return false;
+    await LedgerLocal.enqueue(payload,revision);delete cids.add;await refreshLocal();$('#fAmount').value='';$('#fNote').value='';fillAdd();setMsg('addMsg','Payment saved on this device. It will synchronize when connected.','ok');syncRequested=true;load();return true;
+  }
+  async function resolveLoanConflict(entry){
+    try{
+      var snapshot=await call('getLedgerSnapshot',pin);LedgerLocal.validate(snapshot);
+      if(snapshot.ledgerId!==entry.ledgerId)throw new Error('Wrong spreadsheet deployment.');
+      var context=LedgerPending.loanContext(snapshot,entry.payload.values.loanId),revision=LedgerPending.loanRevision(snapshot,[],entry.payload.values.loanId);
+      var cloud=context?'Cloud amount owed: '+snapshot.currency+nf.format(context.loan.total_payable-context.paidMinor/100):'This loan is no longer available.';
+      if(!await reviewChange('Discard this pending payment?',recordDescription(entry.proposalRecord,'LOAN_PAYMENTS'),cloud+'\n\nThis payment was not synchronized. Discard its pending proposal, then add a new payment if needed. A local audit copy is retained.','Discard pending payment'))return;
+      var fresh=await call('getLedgerSnapshot',pin);LedgerLocal.validate(fresh);
+      if(fresh.ledgerId!==entry.ledgerId||LedgerPending.loanRevision(fresh,[],entry.payload.values.loanId)!==revision)throw new Error('The loan changed again. Review its latest balance before discarding.');
+      await LedgerLocal.save(fresh);await LedgerLocal.discardConflict(entry.ledgerId,entry.mutationId);await refreshLocal();toast('Pending payment discarded.');
+    }catch(error){toast('Could not resolve: '+error.message,true);}
+  }
   async function submitLocal(t,rec){
     if(!cloudSnapshot)throw new Error('Refresh online once before creating offline entries.');
     if(!pin){showLock('Unlock before saving an entry.');return false;}
@@ -1511,6 +1617,7 @@
   async function resolveCloud(id){
     var entry=pendingEntries.find(function(e){return e.mutationId===id;});if(!entry||entry.status!=='conflict')return;
     var proposals=LedgerPending.order(pendingEntries.filter(function(e){return e.payload.table===entry.payload.table&&e.payload.recordId===entry.payload.recordId;}));
+    if(entry.payload.table==='LOAN_PAYMENTS')return resolveLoanConflict(entry);
     var projected=proposals.length?proposals[proposals.length-1].proposalRecord:null;
     if(!await reviewChange('Use the cloud version?',recordDescription(projected,entry.payload.table),recordDescription(entry.conflict.remote,entry.payload.table)+'\n\nThis discards all pending changes to this record. A local audit copy is retained.','Use cloud version'))return;
     try{
@@ -1573,10 +1680,11 @@
       setOptions($('#fCat'), spend.map(function(c){ return [c.id, c.name]; }));
       setOptions($('#fLoan'), loansOpen.map(function(l){ return [l.id, l.name]; }));
       if (!loansOpen.length) need = 'No loan to pay. Add one in the Loans tab.';
+      else if(pendingEntries.some(function(e){return e.payload.table==='LOAN_PAYMENTS'&&e.payload.values.loanId===$('#fLoan').value;}))need='This loan has a pending payment. Synchronize or resolve it on Home before adding another.';
     }
     var nb = $('#addNeed'); nb.hidden = !need; nb.textContent = need;
     $('#addGo').disabled = !!need || saving;
-    $('#addGo').textContent = editDraft ? 'Review changes' : (t!=='Loan'?'Review entry':'Save entry');
+    $('#addGo').textContent = editDraft ? 'Review changes' : 'Review entry';
     $('#cancelEditBtn').hidden = !editDraft;
     $$('#addForm .seg-btn').forEach(function(b){b.disabled=!!editDraft || saving;});
     var hint = $('#fHint'), amt = $('#fAmount');
@@ -1617,19 +1725,9 @@
     else if (t === 'Fund') { fn = 'addTransaction'; rec = Object.assign(base, { type: $('#fDir').value === 'OUT' ? 'FUND_OUT' : 'FUND_IN', categoryId: $('#fCat').value }); label = (byId(data.categories, rec.categoryId) || {}).name; }
     else if (t === 'Income') { fn = 'addIncome'; rec = Object.assign(base, { kind: $('#fKind').value, source: $('#fSource').value }); label = $('#fSource').value.trim() || 'Income'; }
     else { fn = 'addLoanPayment'; rec = Object.assign(base, { loanId: $('#fLoan').value, alsoSpend: !$('#wAlso').hidden && $('#fAlso').checked, categoryId: $('#fCat').value }); label = (byId(data.loans, rec.loanId) || {}).name; }
-    if(t!=='Loan'){
-      saving=true;$('#addGo').disabled=true;
-      submitLocal(t,rec).catch(function(error){setMsg('addMsg',error.message,'err');}).finally(function(){saving=false;fillAdd();});return;
-    }
-    if(navigator.onLine===false){setMsg('addMsg','Loan payments currently require an internet connection.','err');return;}
-    var go = $('#addGo'); go.disabled = true; go.textContent = 'Saving…';
-    mutate(fn, [rec], function(res, err){
-      var g = $('#addGo'); if (g) { g.disabled = false; g.textContent = 'Save entry'; }
-      if (err) { setMsg('addMsg', err, 'err'); return; }
-      delete cids.add; $('#fAmount').value = ''; $('#fNote').value = '';
-      setMsg('addMsg', (res.duplicate ? 'Already saved: ' : 'Saved ') + peso(amount) + ' · ' + (label || ''), 'ok');
-      fillAdd(); $('#fAmount').focus();
-    });
+    saving=true;$('#addGo').disabled=true;
+    (t==='Loan'?submitLoanLocal(rec):submitLocal(t,rec)).catch(function(error){setMsg('addMsg',error.message,'err');}).finally(function(){saving=false;fillAdd();});
+
   }
 
   /* ---------- Funds ---------- */
@@ -1762,7 +1860,7 @@
       return LedgerLocal.save(snapshot).then(function(){
         snapshotStale=false;store.del('sl2_cache');
         return refreshLocal().then(function(){
-          setLocalStatus(snapshot.capabilities&&snapshot.capabilities.recordSyncVersion===1?'Income and ordinary expenses can be saved offline. '+(snapshot.capabilities.fundSyncVersion===1?'Fund deposits and withdrawals are also available offline.':'Update Apps Script to enable offline funds.')+' Loan payments require internet.':'Full ledger cached. Prepare reliable sync and refresh to enable offline entries.');
+          setLocalStatus(snapshot.capabilities&&snapshot.capabilities.recordSyncVersion===1?'Income and ordinary expenses can be saved offline. '+(snapshot.capabilities.fundSyncVersion===1?'Fund deposits and withdrawals are also available offline.':'Update Apps Script to enable offline funds.')+(snapshot.capabilities.loanSyncVersion===1?' Loan payments can also be saved offline.':' Update Apps Script with LoanSync.gs to enable offline loan payments.'):'Full ledger cached. Prepare reliable sync and refresh to enable offline entries.');
           hideBanner();hideLock();renderPending();
         });
       });

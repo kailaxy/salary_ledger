@@ -14,7 +14,7 @@ import org.json.JSONObject;
 /** Fixed-destination HTTPS client. Uses platform TLS verification, with no cookie auth. */
 final class ScriptTransport {
     static final Set<String> METHODS = new HashSet<>(Arrays.asList(
-            "getLedgerSnapshot", "syncLedgerMutation", "addTransaction", "saveCategory",
+            "getLedgerSnapshot", "syncLedgerMutation", "syncLoanPayment", "addTransaction", "saveCategory",
             "deleteCategory", "setBudget", "saveLoan", "deleteLoan", "addLoanPayment",
             "deleteRecord", "saveSettings", "generatePeriods"));
     private static final int MAX_RESPONSE = 8 * 1024 * 1024;

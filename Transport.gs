@@ -65,6 +65,7 @@ function transportInvoke_(method, args) {
   const pin = getPin_();
   // Explicit dispatch: no global lookup, eval, setup calls, or owner-only menu functions.
   if (method === 'getLedgerSnapshot' && args.length === 0) return getLedgerSnapshot(pin);
+  if (method === 'syncLoanPayment' && args.length === 1) return syncLoanPayment(pin,args[0]);
   if (method === 'syncLedgerMutation' && args.length === 1) return syncLedgerMutation(pin,args[0]);
   if (method === 'addTransaction' && args.length === 1) return addTransaction(pin,args[0]);
   if (method === 'saveCategory' && args.length === 1) return saveCategory(pin,args[0]);

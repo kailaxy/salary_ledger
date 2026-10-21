@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "test": "node --test *.test.cjs",
-    "test:browser": "node browser/offline.cjs && node browser/packaged.cjs"
+    "test:browser": "node browser/offline.cjs && node browser/packaged.cjs && node browser/loans.cjs"
   },
   "devDependencies": {
     "fake-indexeddb": "6.2.4",

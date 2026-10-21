@@ -1,6 +1,6 @@
 # Offline assistant integration plan
 
-Status: snapshots, durable local cache, read-only Home assistant, and single-record income/expense outbox synchronization have been implemented incrementally; see offline-step-1.md through offline-step-4.md. Packaged offline startup and native pairing/transport are now implemented for device validation (offline-step-5.md). Stable release signing is implemented with owner-managed GitHub secrets; first signed-device installation remains an owner check. Offline fund deposits/withdrawals are now implemented (offline-step-6.md). Loan payments and other broader offline forms, then on-device inference, remain outstanding. Per the owner’s direction, LLM integration is last.
+Status: snapshots, durable local cache, read-only Home assistant, and single-record income/expense outbox synchronization have been implemented incrementally; see offline-step-1.md through offline-step-4.md. Packaged offline startup and native pairing/transport are now implemented for device validation (offline-step-5.md). Stable release signing is implemented with owner-managed GitHub secrets; first signed-device installation remains an owner check. Offline fund deposits/withdrawals are now implemented (offline-step-6.md). Offline loan payments with optional mirrored spending are implemented (offline-step-7.md). Creating/editing loans and other broader offline forms remain outstanding; on-device inference stays last. Per the owner’s direction, LLM integration is last.
 
 ## Inspected sources
 

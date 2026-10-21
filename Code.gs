@@ -106,7 +106,10 @@ function setPinFromMenu() {
 function withLock_(fn) {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(15000)) throw new Error('BUSY');
-  try { return fn(); } finally { lock.releaseLock(); }
+  try {
+    if (typeof recoverPendingLoanPayments_ === 'function') recoverPendingLoanPayments_(SpreadsheetApp.getActiveSpreadsheet());
+    return fn();
+  } finally { lock.releaseLock(); }
 }
 
 // ------------------------------------------------------------ tiny helpers
@@ -326,7 +329,7 @@ function getState(pin) {
   checkPin_(pin);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   TZ_ = ss.getSpreadsheetTimeZone();
-  try { return buildState_(ss, new Date()); }
+  try { return withLock_(function () { return buildState_(ss, new Date()); }); }
   catch (e) {
     if (/NOT_SETUP/.test(String(e.message))) return { setupDone: false, app: { name: APP_NAME } };
     throw e;
@@ -356,7 +359,7 @@ function getLedgerSnapshot(pin) {
     let syncVersion = 0;
     if (typeof syncJournal_ === 'function') { try { syncJournal_(ss); syncVersion = 1; } catch (e) { /* Explicit preparation is required. */ } }
     return {
-      capabilities: {recordSyncVersion: syncVersion, fundSyncVersion: syncVersion && typeof fundSyncVersion_ === 'function' ? fundSyncVersion_() : 0},
+      capabilities: {recordSyncVersion: syncVersion, fundSyncVersion: syncVersion && typeof fundSyncVersion_ === 'function' ? fundSyncVersion_() : 0, loanSyncVersion: syncVersion && typeof loanSyncVersion_ === 'function' ? loanSyncVersion_() : 0},
       formatVersion: 1, ledgerId: ss.getId(), capturedAt: now.toISOString(),
       timezone: TZ_, currency: settings.currency || '₱', minorUnitScale: 2,
       tables: tables, state: buildState_(ss, now)
