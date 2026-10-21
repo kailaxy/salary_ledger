@@ -1,4 +1,4 @@
-# Android offline frontend (0.2.0)
+# Android offline frontend (0.3.0)
 
 Minimum Android 8.0 / API 26; compile/target API 35. Requires an updated Android System WebView with `WEB_MESSAGE_LISTENER` support and a configured Android device screen lock. Java 17, Gradle 8.9, AGP 8.7.3, AndroidX WebKit 1.12.1. The WebKit artifact's minimum SDK is 21; runtime feature availability is checked separately. Devices without the secure messaging feature receive an update message rather than an unsafe JavaScript-interface fallback.
 
@@ -8,13 +8,32 @@ The APK now bundles `Index.html`, served through WebViewAssetLoader at `https://
 
 Synchronize all pending changes in the current app and verify them in the Sheet first. The packaged page has a different origin from the former hosted WebView, so its IndexedDB and preferences start fresh. There is no automatic migration of unsynchronized records from the old origin. Do not clear app data or uninstall while any changes remain pending.
 
-Actions currently produces a **debug-signed test APK**. Clean CI jobs can generate different debug keys; if Android reports a signature mismatch, stop and verify that all old data has synchronized before replacing the installation. Stable release signing is still required before relying on repeated production APK updates. Never commit a signing key or its passwords to the repository. This change does not silently erase or import old data.
+Actions produces a debug APK for testing and an optional signed release APK for repeatable updates. Debug and release signatures differ: synchronize every pending change and verify the Sheet before the one-time switch from a debug installation. Android cannot install the release over a differently signed debug app. Do not uninstall or clear data while anything is pending. After switching, keep the same release signing key for all future updates.
+
+## Set up stable release signing once
+
+Generate the key on your own trusted computer with Java's `keytool`. It prompts for passwords; do not put passwords in commands, chat or source:
+
+```
+keytool -genkeypair -keystore salary-ledger-release.jks -alias salary-ledger -keyalg RSA -keysize 3072 -validity 10000
+```
+
+Back up this file and its passwords securely outside GitHub. Losing the key prevents installing future updates over this app. In the repository's **Settings → Secrets and variables → Actions**, create four repository secrets:
+
+- `LEDGER_KEYSTORE_BASE64`: base64 encoding of the complete keystore file (use your local base64 tool; paste into the secret field only).
+- `LEDGER_KEYSTORE_PASSWORD`: the keystore password.
+- `LEDGER_KEY_ALIAS`: `salary-ledger` (or the alias you chose).
+- `LEDGER_KEY_PASSWORD`: the key password (usually the same password for the default PKCS12 format).
+
+Run **Build Android APK** manually on **main**, enable **release**, then download **salary-ledger-release-apk** and install `app-release.apk`. Ordinary pushes still produce the debug artifact. Release signing is available only through manual runs on main, never pull requests. Missing secrets fail the release step; it never substitutes a debug key. The temporary key is removed after the step, and signature verification runs before upload. Keep the displayed certificate SHA-256 fingerprint as an update reference; it is public metadata.
+
+CI assigns an increasing version code from the workflow run number. Reruns have the same code; use a new workflow run for the next update. Local builds default to version code 3; set `LEDGER_VERSION_CODE` to a higher integer for local updates. Local release builds also require `LEDGER_KEYSTORE_PATH`, `LEDGER_KEYSTORE_PASSWORD`, `LEDGER_KEY_ALIAS`, and `LEDGER_KEY_PASSWORD` in the process environment. Do not commit signing properties or keys. GitHub secret setup and the first real signed-device update must be completed by the owner; no production signing key is generated in this workspace.
 
 ## Apps Script installation and first connection
 
 1. Update `Code.gs`, `Sync.gs` and `Index.html` in the bound Apps Script project. Add a new script file named **Transport** containing `Transport.gs`.
 2. Save and deploy a **new version of the existing web app**, preserving the `/exec` URL, Execute as Me / Anyone settings and configured ledger PIN. If not done already, reload the Sheet and run Salary Ledger → Prepare reliable sync.
-3. Run the GitHub Actions **Build Android APK** workflow on `main`. Download `salary-ledger-debug-apk`, unzip, and install `app-debug.apk`. The supplied `/exec` URL is the default; the optional repository variable `LEDGER_WEB_APP_URL` overrides it at build time. Do not put a PIN or pairing token in that variable.
+3. Run the GitHub Actions **Build Android APK** workflow on `main`. For regular use, configure release signing above, enable **release**, download `salary-ledger-release-apk`, unzip, and install `app-release.apk`. The debug artifact is for testing. The supplied `/exec` URL is the default; the optional repository variable `LEDGER_WEB_APP_URL` overrides it at build time. Do not put a PIN or pairing token in that variable.
 4. Open the APK and authenticate using the phone's **Android device credential**, which also works offline. A device without a screen lock must set one before cached financial records can be opened.
 5. In the Google Sheet menu choose **Salary Ledger → Pair Android device**. In the app open **Settings → Connect this device**, then enter the one-time code and the existing ledger PIN in the **native Android dialog**. Do not paste either into chat or source code. Pairing requires internet.
 6. Let the first full download complete. Verify that Settings reports a cached ledger and, if prepared, local income/expense saving is available.

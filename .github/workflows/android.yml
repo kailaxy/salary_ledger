@@ -1,6 +1,11 @@
 name: Build Android APK
 on:
   workflow_dispatch:
+    inputs:
+      release:
+        description: 'Build a signed release APK (requires signing secrets; main only)'
+        type: boolean
+        default: false
   push:
     paths: ['android/**', 'Index.html', '.github/workflows/android.yml']
   pull_request:
@@ -15,6 +20,9 @@ jobs:
       LEDGER_WEB_APP_URL: ${{ vars.LEDGER_WEB_APP_URL }}
     steps:
       - uses: actions/checkout@v6
+      - name: Set increasing APK version
+        shell: bash
+        run: echo "LEDGER_VERSION_CODE=$((GITHUB_RUN_NUMBER + 3))" >> "$GITHUB_ENV"
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -44,6 +52,41 @@ jobs:
         with:
           name: salary-ledger-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+      - name: Build signed release
+        if: github.event_name == 'workflow_dispatch' && inputs.release && github.ref == 'refs/heads/main'
+        working-directory: android
+        shell: bash
+        env:
+          LEDGER_KEYSTORE_BASE64: ${{ secrets.LEDGER_KEYSTORE_BASE64 }}
+          LEDGER_KEYSTORE_PASSWORD: ${{ secrets.LEDGER_KEYSTORE_PASSWORD }}
+          LEDGER_KEY_ALIAS: ${{ secrets.LEDGER_KEY_ALIAS }}
+          LEDGER_KEY_PASSWORD: ${{ secrets.LEDGER_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          umask 077
+          export LEDGER_KEYSTORE_PATH="$RUNNER_TEMP/ledger-release.jks"
+          trap 'rm -f "$LEDGER_KEYSTORE_PATH"' EXIT
+          for name in LEDGER_KEYSTORE_BASE64 LEDGER_KEYSTORE_PASSWORD LEDGER_KEY_ALIAS LEDGER_KEY_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              echo "Missing signing secret: $name" >&2
+              exit 1
+            fi
+          done
+          printf '%s' "$LEDGER_KEYSTORE_BASE64" | base64 --decode > "$LEDGER_KEYSTORE_PATH"
+          gradle --no-daemon assembleRelease lintRelease testReleaseUnitTest
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
+      - name: Require main for release signing
+        if: github.event_name == 'workflow_dispatch' && inputs.release && github.ref != 'refs/heads/main'
+        run: |
+          echo 'Signed release builds must run on main.' >&2
+          exit 1
+      - name: Upload signed release
+        if: github.event_name == 'workflow_dispatch' && inputs.release && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v6
+        with:
+          name: salary-ledger-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
       - name: Upload diagnostic reports
         if: always()
