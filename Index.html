@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<base target="_top">
+<meta charset="UTF-8">
+<meta name="color-scheme" content="light">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Salary Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Spectral:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    color-scheme: light;
+    --paper:#EFF2E9;
+    --paper-deep:#E1E7D8;
+    --card:#F7F9F3;
+    --ink:#1B3A2D;
+    --ink-soft:#4A5E53;
+    --ink-mute:#5F7166;
+    --rule:#C7D2BE;
+    --rule-strong:#9FB093;
+    --stamp:#A23B2E;
+    --good:#1F6F46;
+    --spent:#2F6DA3;   /* validated pair: spent / funds */
+    --funds:#C07A12;
+    --nav-h:62px;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; height:100%; background:var(--paper); }
+  body{
+    font-family:'Inter',system-ui,sans-serif;
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+    overflow:hidden;
+  }
+  button{ font:inherit; color:inherit; touch-action:manipulation; }
+
+  .app{
+    height:100vh; height:100dvh;
+    max-width:560px; margin:0 auto;
+    display:flex; flex-direction:column;
+    background:var(--paper);
+    position:relative;
+  }
+
+  /* ---------- top bar ---------- */
+  .top{
+    flex:none;
+    display:flex; align-items:flex-end; justify-content:space-between; gap:12px;
+    padding:calc(env(safe-area-inset-top,0px) + 14px) 16px 10px 20px;
+    border-bottom:2px solid var(--ink);
+    background:var(--card);
+  }
+  .eyebrow{
+    margin:0 0 4px;
+    font:500 10.5px/1.2 'IBM Plex Mono',monospace;
+    letter-spacing:.08em; text-transform:uppercase; color:var(--ink-mute);
+  }
+  .top h1{
+    margin:0; font:700 26px/1 'Spectral',serif; letter-spacing:-.01em;
+  }
+  .icon-btn{
+    width:44px; height:44px; flex:none;
+    display:grid; place-items:center;
+    background:none; border:1px solid var(--rule-strong); border-radius:3px;
+    color:var(--ink); cursor:pointer;
+  }
+  .icon-btn:active{ background:var(--paper-deep); }
+  .icon-btn svg{ width:20px; height:20px; }
+  .icon-btn.spin svg{ animation:spin .9s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  :focus-visible{ outline:2px solid var(--ink); outline-offset:2px; }
+
+  /* ---------- banner ---------- */
+  .banner{
+    flex:none; margin:0; padding:10px 20px;
+    font:500 12.5px/1.4 'Inter',sans-serif;
+    background:#F3E3DF; color:#6E2519; border-bottom:1px solid #DDB7B0;
+    display:flex; justify-content:space-between; align-items:center; gap:12px;
+  }
+  .banner[hidden]{ display:none; }
+  .banner button{
+    background:none; border:1px solid currentColor; border-radius:3px;
+    padding:6px 14px; min-height:40px; cursor:pointer; font-weight:600;
+  }
+
+  /* ---------- scrolling area ---------- */
+  main{
+    flex:1; min-height:0;
+    overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain;
+    padding:16px 16px calc(var(--nav-h) + env(safe-area-inset-bottom,0px) + 20px);
+  }
+  .panel{ display:none; }
+  .panel.on{ display:block; animation:rise .25s ease both; }
+  @keyframes rise{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--rule);
+    padding:16px;
+    margin:0 0 14px;
+    border-radius:3px;
+  }
+  .label{
+    margin:0 0 6px;
+    font:500 11px/1.2 'Inter',sans-serif;
+    letter-spacing:.07em; text-transform:uppercase; color:var(--ink-soft);
+  }
+  .h2{
+    margin:0 0 4px; font:600 17px/1.25 'Spectral',serif;
+  }
+  .sub{ margin:0; font:400 12.5px/1.45 'Inter',sans-serif; color:var(--ink-soft); }
+  .mono{ font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums; }
+  .hero-num{
+    margin:2px 0 4px;
+    font:700 clamp(44px,13.5vw,56px)/1 'Inter',sans-serif;
+    letter-spacing:-.025em; font-variant-numeric:proportional-nums;
+  }
+  .big-num{
+    margin:2px 0 4px;
+    font:700 34px/1.05 'Inter',sans-serif; letter-spacing:-.02em;
+    font-variant-numeric:proportional-nums;
+  }
+  .kpi-num{
+    margin:0 0 6px;
+    font:700 22px/1.1 'Inter',sans-serif; letter-spacing:-.015em;
+    font-variant-numeric:proportional-nums;
+  }
+
+  /* split bar */
+  .split{
+    display:flex; gap:2px; height:14px; margin:16px 0 14px;
+    border-radius:4px; overflow:hidden; background:var(--card);
+  }
+  .seg{ display:block; height:100%; }
+  .spent{ background:var(--spent); }
+  .funds{ background:var(--funds); }
+  .hatch{
+    background:repeating-linear-gradient(45deg,var(--rule-strong) 0 2px,var(--paper-deep) 2px 5px);
+  }
+  .sw.none{ background:transparent; }
+  .legend3{ list-style:none; margin:0; padding:0; }
+  .legend3 li{
+    display:grid; grid-template-columns:10px 1fr auto 46px; gap:8px; align-items:center;
+    padding:7px 0; border-top:1px solid var(--rule); font-size:13px;
+  }
+  .legend3 li:first-child{ border-top:none; }
+  .sw{ width:10px; height:10px; display:block; flex:none; border-radius:2px; }
+  .legend3 .amt{ font:500 13px 'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .legend3 .pc{ font:400 11.5px 'IBM Plex Mono',monospace; color:var(--ink-mute); text-align:right; white-space:nowrap; }
+
+  .kpis{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:0 0 14px; }
+  .kpis .card{ margin:0; padding:14px; }
+  .foot{ margin:0; font:400 12px/1.4 'Inter',sans-serif; color:var(--ink-soft); }
+
+  /* per pay period chart */
+  .chart-head{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:10px; }
+  .chart-legend{ display:flex; gap:12px; flex-wrap:wrap; margin:0 0 12px; font-size:12px; color:var(--ink-soft); }
+  .chart-legend span{ display:inline-flex; align-items:center; gap:6px; }
+  .cols{ display:flex; border-bottom:1px solid var(--rule-strong); }
+  .col{
+    flex:1 1 0; min-width:0; padding:0; border:0; background:none; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; border-radius:3px 3px 0 0;
+  }
+  .col.sel{ background:var(--paper-deep); }
+  .slot{ height:128px; width:100%; display:flex; align-items:flex-end; justify-content:center; }
+  .stack{
+    width:min(18px,70%); display:flex; flex-direction:column-reverse; gap:2px;
+    border-radius:4px 4px 0 0; overflow:hidden; background:var(--card);
+  }
+  .stack.ghost{ background:transparent; border:1px dashed var(--rule-strong); border-bottom:0; }
+  .day{ margin:6px 0 4px; font:500 10px/1 'IBM Plex Mono',monospace; color:var(--ink-mute); }
+  .col.sel .day{ color:var(--ink); font-weight:600; }
+  .months{ display:flex; margin-top:2px; }
+  .months span{
+    text-align:center; font:500 10px/1 'IBM Plex Mono',monospace; color:var(--ink-mute);
+    letter-spacing:.06em; text-transform:uppercase; padding:5px 0 0;
+    border-left:1px solid var(--rule);
+  }
+  .months span:first-child{ border-left:0; }
+  .detail{
+    margin:12px 0 0; padding-top:12px; border-top:1px dashed var(--rule-strong);
+  }
+  .detail-title{ margin:0 0 8px; font:600 13px 'Inter',sans-serif; }
+  .detail-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(72px,1fr)); gap:8px 10px; }
+  .detail-grid p{ margin:0; }
+  .detail-grid .k{ display:flex; align-items:center; gap:5px; font-size:10.5px; color:var(--ink-soft); margin-bottom:2px; }
+  .detail-grid .v{ font:500 12.5px 'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums; }
+
+  /* progress bars */
+  .ruler{
+    position:relative; height:12px; margin:12px 0 6px;
+    background:
+      repeating-linear-gradient(90deg,var(--rule-strong) 0 1px,transparent 1px 25%),
+      var(--paper-deep);
+    border:1px solid var(--rule-strong); border-radius:2px;
+  }
+  .fill{
+    position:absolute; left:0; top:0; bottom:0; width:0;
+    border-radius:0 4px 4px 0;
+    transition:width .9s cubic-bezier(.2,.8,.2,1);
+  }
+  .fill.funds{ background:var(--funds); }
+  .fill.spent{ background:var(--spent); }
+  .fill.loan{
+    background:repeating-linear-gradient(45deg,var(--ink) 0 4px,#2C5443 4px 8px);
+  }
+  .marker{
+    position:absolute; top:-5px; bottom:-5px; width:2px; background:var(--stamp); margin-left:-1px;
+  }
+  .marker::after{
+    content:''; position:absolute; top:-5px; left:50%; transform:translateX(-50%);
+    border:4px solid transparent; border-top:5px solid var(--stamp); border-bottom:0;
+  }
+  .row-head{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+  .row-name{ margin:0; font:600 14px/1.3 'Inter',sans-serif; }
+  .row-amt{ margin:0; font:600 15px 'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums; }
+  .row-sub{ margin:0; display:flex; justify-content:space-between; gap:10px; font-size:12px; color:var(--ink-soft); }
+  .row-sub .mono{ font-size:12px; }
+  .status{ font-weight:600; }
+  .status.bad{ color:var(--stamp); }
+  .status.ok{ color:var(--good); }
+  .status.flat{ color:var(--ink-soft); }
+  .legend-line{
+    display:flex; gap:16px; flex-wrap:wrap; margin:0 0 14px; font-size:12px; color:var(--ink-soft);
+  }
+  .legend-line span{ display:inline-flex; align-items:center; gap:6px; }
+  .legend-line .mk{ width:2px; height:12px; background:var(--stamp); display:inline-block; }
+
+  .tiles{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:12px; }
+  .tiles p{ margin:0; }
+  .tiles .k{ font-size:10.5px; color:var(--ink-soft); letter-spacing:.04em; text-transform:uppercase; margin-bottom:3px; }
+  .tiles .v{ font:500 12.5px 'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums; }
+
+  /* stamp */
+  .stamp{ position:relative; width:72px; height:72px; flex:none; transform:rotate(-8deg); display:grid; place-items:center; }
+  .stamp svg{ position:absolute; inset:0; width:100%; height:100%; }
+  .stamp-t{ position:relative; text-align:center; color:var(--stamp); font-family:'IBM Plex Mono',monospace; line-height:1.05; }
+  .stamp-t b{ display:block; font-size:17px; }
+  .stamp-t span{ display:block; font-size:8px; letter-spacing:.1em; }
+  .loan-top{ display:flex; justify-content:space-between; align-items:center; gap:12px; }
+
+  .callout{
+    margin:0 0 14px; padding:12px 14px; border:1px solid var(--rule); border-left:4px solid var(--stamp);
+    background:var(--card); border-radius:3px; font-size:13px; line-height:1.5;
+  }
+  .callout.ok{ border-left-color:var(--good); }
+  .callout b{ font-weight:600; }
+
+  /* details / lists */
+  details.card{ padding:0; }
+  details summary{
+    list-style:none; cursor:pointer; padding:14px 16px; min-height:52px;
+    display:flex; justify-content:space-between; align-items:center; gap:12px;
+  }
+  details summary::-webkit-details-marker{ display:none; }
+  details summary .chev{ width:18px; height:18px; flex:none; transition:transform .2s ease; }
+  details[open] summary .chev{ transform:rotate(180deg); }
+  details .body{ padding:0 16px 8px; border-top:1px solid var(--rule); }
+  .line{
+    display:flex; justify-content:space-between; gap:12px; padding:9px 0;
+    border-top:1px solid var(--rule); font-size:13px;
+  }
+  .line:first-child{ border-top:0; }
+  .line .mono{ font-size:13px; }
+  .line.total{ font-weight:600; border-top:1px solid var(--ink); }
+  .group-name{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin:0 0 6px; }
+  .badge{
+    display:inline-block; padding:2px 8px; border:1px solid var(--rule-strong); border-radius:2px;
+    font:600 10.5px 'IBM Plex Mono',monospace; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-soft);
+  }
+  .badge.paid{ border-color:var(--good); color:var(--good); }
+
+  .note{
+    margin:6px 0 0; padding:2px 0 2px 14px; border-left:3px solid var(--rule-strong);
+    font:italic 500 14px/1.55 'Spectral',serif; color:var(--ink-soft);
+  }
+  .note + .note{ margin-top:10px; }
+  .caption{ margin:0 0 8px; font:500 10.5px 'IBM Plex Mono',monospace; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-mute); }
+
+  .skel{ height:14px; margin:0 0 10px; border-radius:2px; background:linear-gradient(90deg,var(--paper-deep),var(--card),var(--paper-deep)); background-size:200% 100%; animation:shimmer 1.4s linear infinite; }
+  @keyframes shimmer{ to{ background-position:-200% 0; } }
+
+  /* ---------- bottom tabs ---------- */
+  .tabs{
+    position:absolute; left:0; right:0; bottom:0;
+    display:grid; grid-template-columns:repeat(5,1fr);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+    background:var(--card); border-top:1px solid var(--rule-strong);
+  }
+  .tab{
+    height:var(--nav-h); border:0; background:none; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+    color:var(--ink-mute); position:relative; font:500 11px/1 'Inter',sans-serif;
+  }
+  .tab svg{ width:23px; height:23px; }
+  .tab[aria-selected="true"]{ color:var(--ink); font-weight:700; }
+  .tab[aria-selected="true"]::before{
+    content:''; position:absolute; top:-1px; left:22%; right:22%; height:3px; background:var(--ink);
+  }
+
+  /* ---------- PIN screen ---------- */
+  .lock{
+    position:absolute; inset:0; z-index:10; background:var(--paper);
+    display:flex; flex-direction:column; justify-content:center; padding:32px 28px;
+  }
+  .lock[hidden]{ display:none; }
+  .lock h2{ margin:0 0 6px; font:700 28px/1.1 'Spectral',serif; }
+  .lock p{ margin:0 0 20px; color:var(--ink-soft); font-size:14px; line-height:1.5; }
+  .lock input{
+    width:100%; height:54px; padding:0 14px; margin-bottom:12px;
+    font:500 22px 'IBM Plex Mono',monospace; letter-spacing:.3em; text-align:center;
+    border:1px solid var(--rule-strong); border-radius:3px; background:var(--card); color:var(--ink);
+  }
+  .lock .go{
+    width:100%; height:52px; border:0; border-radius:3px; cursor:pointer;
+    background:var(--ink); color:var(--card); font:600 16px 'Inter',sans-serif;
+  }
+  .lock .err{ min-height:20px; margin:0 0 10px; color:var(--stamp); font-size:13px; font-weight:500; }
+
+
+  /* ---------- add-record form ---------- */
+  .seg-ctl{ display:grid; grid-template-columns:repeat(4,1fr); border:1px solid var(--ink); border-radius:3px; overflow:hidden; margin:0 0 16px; }
+  .seg-btn{
+    height:44px; border:0; border-left:1px solid var(--rule-strong); background:var(--card); cursor:pointer;
+    font:600 13px 'Inter',sans-serif; color:var(--ink-soft);
+  }
+  .seg-btn:first-child{ border-left:0; }
+  .seg-btn[aria-checked="true"]{ background:var(--ink); color:var(--card); }
+  .fld{ display:block; margin:0 0 14px; }
+  .fld[hidden], .chk[hidden]{ display:none; }
+  .fld input[type=text], .fld input[type=date], .fld select, .amt-wrap input{
+    width:100%; height:48px; padding:0 12px; font:500 16px 'Inter',sans-serif; color:var(--ink);
+    background:var(--paper); border:1px solid var(--rule-strong); border-radius:3px; appearance:none; -webkit-appearance:none;
+  }
+  .fld select{
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231B3A2D' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 12px center; background-size:18px; padding-right:38px;
+  }
+  .amt-wrap{ position:relative; }
+  .amt-wrap b{ position:absolute; left:14px; top:50%; transform:translateY(-50%); font:600 26px 'Inter',sans-serif; color:var(--ink-mute); }
+  .amt-wrap input{ height:62px; padding-left:40px; font:700 30px 'Inter',sans-serif; letter-spacing:-.01em; }
+  .chk{ display:flex; gap:10px; align-items:flex-start; margin:0 0 14px; font-size:13px; line-height:1.4; color:var(--ink-soft); }
+  .chk input{ width:22px; height:22px; margin:0; flex:none; accent-color:var(--ink); }
+  .go{
+    width:100%; height:52px; border:0; border-radius:3px; cursor:pointer;
+    background:var(--ink); color:var(--card); font:600 16px 'Inter',sans-serif;
+  }
+  .go[disabled]{ opacity:.55; cursor:default; }
+  .form-msg{ min-height:20px; margin:0 0 10px; font-size:13px; font-weight:500; }
+  .form-msg.err{ color:var(--stamp); }
+  .form-msg.ok{ color:var(--good); }
+  .rec{ display:grid; grid-template-columns:1fr auto auto; gap:4px 10px; align-items:center; padding:10px 0; border-top:1px solid var(--rule); }
+  .rec:first-of-type{ border-top:0; }
+  .rec-name{ margin:0; font:600 14px/1.3 'Inter',sans-serif; overflow-wrap:anywhere; }
+  .rec-amt{ margin:0; font:600 14px 'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .rec-amt.in{ color:var(--good); }
+  .rec-sub{ grid-column:1 / 3; margin:0; font-size:12px; color:var(--ink-soft); overflow-wrap:anywhere; }
+  .del{
+    grid-column:3; grid-row:1 / 3; min-width:44px; height:44px; padding:0 8px; background:none; cursor:pointer;
+    border:1px solid var(--rule-strong); border-radius:3px; color:var(--ink-soft); font:600 12px 'Inter',sans-serif;
+  }
+  .del.armed{ border-color:var(--stamp); background:var(--stamp); color:#fff; }
+
+  @media (prefers-reduced-motion:reduce){
+    *{ animation:none !important; transition:none !important; }
+  }
+
+  .toast{
+    position:absolute; left:16px; right:16px; bottom:calc(var(--nav-h) + env(safe-area-inset-bottom,0px) + 12px); z-index:20;
+    margin:0; padding:12px 14px; border-radius:3px; font:500 13px/1.4 'Inter',sans-serif;
+    background:var(--ink); color:var(--card); box-shadow:0 2px 0 rgba(0,0,0,.15);
+  }
+  .toast[hidden]{ display:none; }
+  .toast.err{ background:var(--stamp); }
+  .btn2{
+    min-height:44px; padding:0 16px; border:1px solid var(--ink); border-radius:3px; background:var(--card);
+    font:600 14px 'Inter',sans-serif; color:var(--ink); cursor:pointer;
+  }
+  .btn2.solid{ background:var(--ink); color:var(--card); }
+  .btn2[disabled]{ opacity:.55; cursor:default; }
+  .btn-row{ display:flex; gap:10px; flex-wrap:wrap; margin-top:4px; }
+  .link{
+    background:none; border:0; padding:6px 0 6px 10px; min-height:36px; cursor:pointer;
+    font:600 12px 'Inter',sans-serif; color:var(--ink-soft); text-decoration:underline;
+  }
+  .prow{ display:grid; grid-template-columns:1fr 112px; gap:10px; align-items:start; padding:12px 0; border-top:1px solid var(--rule); }
+  .prow:first-of-type{ border-top:0; }
+  .prow .ruler{ margin:8px 0 2px; height:8px; }
+  .plan-in{
+    width:100%; height:44px; padding:0 10px; text-align:right; font:500 15px 'IBM Plex Mono',monospace;
+    background:var(--paper); color:var(--ink); border:1px solid var(--rule-strong); border-radius:3px;
+  }
+  .fill.over{ background:var(--stamp); }
+  .grp{ margin:14px 0 2px; font:600 12px 'Inter',sans-serif; color:var(--ink-soft); }
+  .steps{ margin:8px 0 0; padding-left:20px; font-size:14px; line-height:1.6; }
+  .two{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .fld input[type=number]{ width:100%; height:48px; padding:0 12px; font:500 16px 'Inter',sans-serif; color:var(--ink); background:var(--paper); border:1px solid var(--rule-strong); border-radius:3px; }
+  details.inst{ margin-top:12px; border-top:1px dashed var(--rule-strong); padding-top:8px; }
+  details.inst summary{ cursor:pointer; min-height:36px; display:flex; align-items:center; font:600 13px 'Inter',sans-serif; }
+  .inst-row{ display:grid; grid-template-columns:28px 1fr auto auto; gap:8px; align-items:center; padding:7px 0; border-top:1px solid var(--rule); font-size:12.5px; }
+  .inst-row:first-of-type{ border-top:0; }
+  .badge.bad{ border-color:var(--stamp); color:var(--stamp); }
+  .hint{ margin:-6px 0 14px; font-size:12px; color:var(--ink-soft); }
+  .setgrid .fld{ margin-bottom:10px; }
+
+  /* amount field: must out-rank ".fld input[type=text]" or the peso sign overlaps the digits */
+  .fld .amt-wrap input[type=text]{ height:62px; padding:0 12px 0 46px; font:700 30px 'Inter',sans-serif; letter-spacing:-.01em; }
+  .top-actions{ display:flex; gap:8px; flex:none; }
+  .modal{
+    position:absolute; inset:0; z-index:40; display:flex; align-items:flex-end;
+    background:rgba(27,58,45,.45);
+  }
+  .modal[hidden]{ display:none; }
+  .sheet{
+    width:100%; max-height:88vh; max-height:88dvh; overflow-y:auto; overscroll-behavior:contain;
+    background:var(--card); border-top:2px solid var(--ink); border-radius:6px 6px 0 0;
+    padding:16px 16px calc(env(safe-area-inset-bottom,0px) + 20px);
+    animation:rise .2s ease both;
+  }
+  .sheet-head{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin:0 0 14px; }
+  .sheet-head h2{ margin:0; font:700 22px/1.1 'Spectral',serif; }
+  .sheet .fld{ margin-bottom:10px; }
+  .guide-content{ font-size:14px; line-height:1.65; overflow-wrap:anywhere; }
+  .guide-content h2{ font:700 24px/1.2 'Spectral',serif; }
+  .guide-content h3{ margin:24px 0 8px; font:700 20px/1.3 'Spectral',serif; }
+  .guide-content h4{ margin:18px 0 6px; font-size:16px; }
+  .guide-content p{ margin:8px 0; }
+  .guide-content ul,.guide-content ol{ padding-left:24px; }
+  .guide-content li{ margin:8px 0; }
+  .guide-content code{ font-size:.9em; }
+  .guide-nav{ padding-top:16px; border-top:1px dashed var(--rule-strong); margin-top:18px; }
+  .toast{ z-index:60; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="top">
+    <div>
+      <p class="eyebrow" id="eyebrow">Salary Ledger</p>
+      <h1 id="screenTitle">Overview</h1>
+    </div>
+    <div class="top-actions">
+      <button class="icon-btn" id="settingsBtn" type="button" data-act="opensettings" aria-label="Settings" aria-haspopup="dialog">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
+      <button class="icon-btn" id="refresh" type="button" aria-label="Refresh data">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <p class="banner" id="banner" role="status" hidden></p>
+
+  <main id="main">
+    <section class="panel" id="panel-home" role="tabpanel" aria-labelledby="tab-home"></section>
+    <section class="panel" id="panel-plan" role="tabpanel" aria-labelledby="tab-plan"></section>
+    <section class="panel" id="panel-add" role="tabpanel" aria-labelledby="tab-add"></section>
+    <section class="panel" id="panel-funds" role="tabpanel" aria-labelledby="tab-funds"></section>
+    <section class="panel" id="panel-loans" role="tabpanel" aria-labelledby="tab-loans"></section>
+  </main>
+
+  <p class="toast" id="toast" role="status" aria-live="polite" hidden></p>
+
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button class="tab" id="tab-home" role="tab" data-tab="home" aria-controls="panel-home" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+      Home
+    </button>
+    <button class="tab" id="tab-plan" role="tab" data-tab="plan" aria-controls="panel-plan" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>
+      Plan
+    </button>
+    <button class="tab" id="tab-add" role="tab" data-tab="add" aria-controls="panel-add" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="2"/><path d="M12 8v8M8 12h8"/></svg>
+      Add
+    </button>
+    <button class="tab" id="tab-funds" role="tab" data-tab="funds" aria-controls="panel-funds" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>
+      Funds
+    </button>
+    <button class="tab" id="tab-loans" role="tab" data-tab="loans" aria-controls="panel-loans" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10l9-6 9 6"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8"/><path d="M3 20h18"/></svg>
+      Loans
+    </button>
+  </nav>
+
+  <div class="modal" id="settingsModal" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+      <div class="sheet-head">
+        <h2 id="setTitle">Settings</h2>
+        <button class="icon-btn" id="setClose" type="button" data-act="closesettings" aria-label="Close settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div id="settingsView">
+        <div id="settingsBody"></div>
+        <div class="guide-nav"><button class="btn2" id="guideBtn" type="button" data-act="openguide">Guide</button></div>
+      </div>
+      <div id="guideView" hidden>
+        <button class="btn2" id="guideBack" type="button" data-act="backsettings">Back to settings</button>
+        <article class="guide-content" aria-label="Salary Ledger quick guide">
+          <h2>Salary Ledger — Quick Guide</h2>
+          <p>Salary Ledger tracks each paycheck from the moment it arrives: what you planned to do with it, what you actually spent, what went into savings funds, and what you still owe on loans. Everything is stored in your own Google Sheet.</p>
+          <h3>The four ideas</h3>
+          <ul>
+          <li><strong>Pay period</strong>: one paycheck. Periods are created from your pay days (default: the 15th and the last day of the month). Every expense, fund deposit and income entry belongs to one pay period.</li>
+          <li><strong>Category</strong>: something you spend on, like Rent or Groceries. Categories can have an optional group (for example, Home).</li>
+          <li><strong>Fund</strong>: money you set aside toward a goal, like an Emergency Fund. A fund has a balance and an optional target amount and date.</li>
+          <li><strong>Loan</strong>: money you owe, with a fixed number of installments. The app builds the schedule for you.</li>
+          </ul>
+          <h3>First-time setup (about 5 minutes)</h3>
+          <ol>
+          <li>Create a blank Google Sheet, then Extensions → Apps Script. Paste in <code>Code.gs</code> and add <code>Index.html</code>.</li>
+          <li>Reload the sheet. Open the <strong>Salary Ledger</strong> menu → <strong>Set up (run once)</strong>.</li>
+          <li><strong>Salary Ledger → Set or change PIN</strong> (6 to 12 digits). Saving is switched off until a PIN exists.</li>
+          <li>Deploy → New deployment → Web app. Execute as: Me. Who has access: Anyone. Open the link on your phone.</li>
+          </ol>
+          <h3>The screens</h3>
+          <h4>Home</h4>
+          <p>Your summary at a glance: total saved (salary received minus spending), where your salary went (spent, moved to funds, not yet assigned), total loans owed, the current pay period, and a history of past pay periods.</p>
+          <h4>Plan</h4>
+          <p>Decide what each paycheck is for.</p>
+          <ul>
+          <li>Pick a pay period at the top, then type a planned amount beside each category or fund. It saves when you leave the box.</li>
+          <li>Tick <strong>copy to every later pay period</strong> to set a recurring amount once instead of every paycheck.</li>
+          <li>The bar under each row shows how much of the plan you have used. It turns red when you go over.</li>
+          <li><strong>New category</strong> and <strong>New fund</strong> create them. Tap <strong>Edit</strong> on any row to rename it, change its group or target, archive it (hides it but keeps its history), or delete it (only possible if it has no records).</li>
+          </ul>
+          <h4>Add</h4>
+          <p>One form for everything you record. Pick the type at the top:</p>
+          <ul>
+          <li><strong>Expense</strong>: amount, category, pay period, date, optional note.</li>
+          <li><strong>Fund</strong>: deposit into a fund or withdraw from it. You can&#x27;t withdraw more than the fund holds.</li>
+          <li><strong>Income</strong>: salary, bonus or other, with an optional source such as your employer. You can enter more than one per pay period.</li>
+          <li><strong>Loan pay</strong>: choose the loan; the amount is filled in with the next installment. Leave <strong>Also count it as spending</strong> ticked if the payment should reduce your budget in a category (for example, Loan Payment).</li>
+          </ul>
+          <p>Recent entries appear below the form. To remove one, tap <strong>Delete</strong> and then <strong>Sure?</strong>. To fix a mistake, delete the entry and add it again.</p>
+          <h4>Funds</h4>
+          <p>Every fund with its balance, progress toward its target, how far you have to go, and whether you are on track against your plan so far. <strong>New fund</strong> starts a fund from here.</p>
+          <h4>Loans</h4>
+          <ul>
+          <li><strong>New loan</strong>: enter what you borrowed, the total to repay (including interest and fees), the number of installments, the first due date, and how often you pay (twice a month, monthly, every 2 weeks or weekly).</li>
+          <li>Each loan card shows progress, what is left, and the next installment due. <strong>Installments</strong> lists the full schedule with paid, partial and overdue marks. <strong>Payments</strong> lists what you have paid.</li>
+          <li><strong>Record payment</strong> jumps to the Add screen for that loan. Payments cover installments oldest first.</li>
+          <li>You can delete a loan only after its payments are deleted.</li>
+          </ul>
+          <h4>Settings (gear icon, top right)</h4>
+          <ul>
+          <li><strong>App name</strong>: rename the app.</li>
+          <li><strong>Pay days</strong>: day numbers from 1 to 28, or EOM for end of month, for example <code>15,EOM</code> or <code>10,25</code>. This applies to pay periods you add from now on.</li>
+          <li><strong>Add pay periods for year</strong>: creates the pay periods for another year. Do this each December.</li>
+          </ul>
+          <h4>Refresh (arrow icon)</h4>
+          <p>Reloads the latest data from your sheet. Useful if you also edit the sheet directly.</p>
+          <h3>Good habits</h3>
+          <ul>
+          <li>Record salary first each pay period, then log expenses as they happen.</li>
+          <li>Set your plan at the start of a period, so the Plan bars tell you where you stand.</li>
+          <li>Keep the PIN to yourself. Anyone with the link and PIN can add or delete records.</li>
+          </ul>
+          <h3>Behind the scenes</h3>
+          <p>The setup creates ten tabs: SETTINGS, PAY_PERIODS, INCOME, CATEGORIES, FUND_GOALS, BUDGET_LINES, TRANSACTIONS, LOANS, LOAN_INSTALLMENTS and LOAN_PAYMENTS. Deleting a record in the app only stamps its <code>deleted_at</code> column, so you can restore it by clearing that cell. Please avoid editing IDs or moving columns by hand.</p>
+          <h3>If something looks wrong</h3>
+          <ul>
+          <li><strong>&quot;Set up (run once)&quot; message in the app</strong>: run the setup from the sheet&#x27;s Salary Ledger menu, then refresh.</li>
+          <li><strong>&quot;Saving is off until you set a PIN&quot;</strong>: use Salary Ledger → Set or change PIN in the sheet.</li>
+          <li><strong>&quot;Too many wrong tries&quot;</strong>: wait 10 minutes and try again.</li>
+          <li><strong>A save seemed to fail</strong>: tap Save again. A retry never records the same entry twice.</li>
+          </ul>
+        </article>
+      </div>
+    </div>
+  </div>
+
+  <form class="lock" id="lock" hidden autocomplete="off">
+    <h2 id="lockName">Salary Ledger</h2>
+    <p>Enter your PIN to open the app.</p>
+    <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" aria-label="PIN" maxlength="12">
+    <p class="err" id="pinErr" role="alert"></p>
+    <button class="go" type="submit">Unlock</button>
+  </form>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ---------- helpers ---------- */
+  var $ = function(s){ return document.querySelector(s); };
+  var $$ = function(s, r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
+  var esc = function(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
+  var nf = new Intl.NumberFormat('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  var peso = function(n){ return (n < 0 ? '−' : '') + '₱' + nf.format(Math.abs(n)); };
+  var clamp = function(n, a, b){ return Math.max(a, Math.min(b, n)); };
+  var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var fmtDate = function(iso){ if (!iso) return ''; var p = iso.split('-'); return MONTHS[+p[1] - 1] + ' ' + (+p[2]); };
+  var fmtLong = function(iso){ return iso ? fmtDate(iso) + ', ' + iso.slice(0, 4) : ''; };
+  var parseAmt = function(v){ var n = parseFloat(String(v == null ? '' : v).replace(/[,\s₱]/g, '')); return isFinite(n) ? n : NaN; };
+  var uid = function(){ return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 9); };
+  var store = {
+    get: function(k){ try { return localStorage.getItem(k); } catch(e){ return null; } },
+    set: function(k, v){ try { localStorage.setItem(k, v); } catch(e){} },
+    del: function(k){ try { localStorage.removeItem(k); } catch(e){} }
+  };
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var TITLES = { home:'Overview', plan:'Plan', add:'Add record', funds:'Funds', loans:'Loans' };
+  var data = null, busy = false, saving = false;
+  var tab = store.get('sl2_tab'); if (!TITLES[tab]) tab = 'home';
+  var pin = store.get('sl2_pin') || '';
+  var planPer = null, addType = 'Expense', armed = null, armTimer = null, cids = {}, toastTimer = null;
+  var catDraft = null, loanOpen = false;
+
+  function call(fn){
+    var args = Array.prototype.slice.call(arguments, 1);
+    return new Promise(function(resolve, reject){
+      var r = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+      r[fn].apply(r, args);
+    });
+  }
+  function cidFor(k){ if (!cids[k]) cids[k] = uid(); return cids[k]; }
+  function setMsg(id, text, kind){ var el = $('#' + id); if (!el) return; el.className = 'form-msg' + (kind ? ' ' + kind : ''); el.textContent = text || ''; }
+  function toast(text, isErr){
+    var t = $('#toast'); t.textContent = text; t.className = 'toast' + (isErr ? ' err' : ''); t.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.hidden = true; }, 3800);
+  }
+  function errText(err){
+    var m = String((err && err.message) || err), r;
+    if ((r = /INVALID: (.*)$/.exec(m))) return r[1];
+    if (/BAD_PIN/.test(m)) { pin = ''; store.del('sl2_pin'); showLock('That PIN isn’t right.'); return ''; }
+    if (/PIN_REQUIRED/.test(m)) { showLock(''); return ''; }
+    if (/LOCKED/.test(m)) { showLock('Too many wrong tries. Wait 10 minutes, then try again.'); return ''; }
+    if (/PIN_NOT_SET/.test(m)) return 'Saving is off until you set a PIN: in your sheet, open Salary Ledger → Set or change PIN.';
+    if (/NOT_SETUP/.test(m)) return 'In your sheet, open Salary Ledger → Set up (run once).';
+    if (/BUSY/.test(m)) return 'Another save is still running. Try again in a moment.';
+    return 'Couldn’t save. Check your connection and tap again. It won’t double-record.';
+  }
+  function applyState(s){
+    data = s; store.set('sl2_cache', JSON.stringify(s)); hideBanner(); hideLock(); render();
+  }
+  /* one write: done(result|null, errorText) */
+  function mutate(fn, args, done){
+    if (saving) return; saving = true;
+    call.apply(null, [fn, pin].concat(args)).then(function(res){ applyState(res.state); return { res: res }; },
+      function(err){ return { err: errText(err) }; })
+    .then(function(o){ saving = false; if (done) done(o.res || null, o.err || ''); })
+    .catch(function(e){ saving = false; if (window.console) console.error(e); toast('Something went wrong showing the result. Pull to refresh.', true); });
+  }
+
+  /* ---------- lookups ---------- */
+  function byId(list, id){ for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i]; return null; }
+  function period(id){ return data ? byId(data.periods, id) : null; }
+  function multiYear(){ return data && data.years.length > 1; }
+  function perLabel(p){ return p.label + (multiYear() ? ', ' + p.date.slice(0, 4) : ''); }
+  function cats(kind, withArchived){ return data.categories.filter(function(c){ return c.kind === kind && (withArchived || !c.archived); }); }
+  function setOptions(sel, pairs, prefer){
+    var cur = sel.value;
+    sel.innerHTML = pairs.map(function(p){ return '<option value="' + esc(p[0]) + '">' + esc(p[1]) + '</option>'; }).join('');
+    var has = function(v){ return pairs.some(function(p){ return p[0] === v; }); };
+    if (has(cur)) sel.value = cur; else if (prefer !== undefined && has(prefer)) sel.value = prefer;
+  }
+  function periodPairs(){ return data.periods.map(function(p){ return [p.id, perLabel(p)]; }); }
+  function delBtn(kind, id, label){
+    var key = kind + ':' + id, on = armed === key;
+    return '<button type="button" class="del' + (on ? ' armed' : '') + '" data-act="del" data-kind="' + kind + '" data-id="' + esc(id) + '" aria-label="Delete ' + esc(label) + '">' + (on ? 'Sure?' : 'Delete') + '</button>';
+  }
+  function onDelete(kind, id){
+    var key = kind + ':' + id;
+    if (armed !== key) {
+      armed = key; clearTimeout(armTimer);
+      armTimer = setTimeout(function(){ armed = null; if (data && data.setupDone) render(); }, 4000);
+      render(); return;
+    }
+    clearTimeout(armTimer); armed = null;
+    var fn = kind === 'cat' ? 'deleteCategory' : kind === 'loan' ? 'deleteLoan' : 'deleteRecord';
+    var args = (kind === 'cat' || kind === 'loan') ? [id] : [kind, id];
+    mutate(fn, args, function(res, err){
+      if (err) { toast(err, true); render(); } else { toast('Deleted.'); if (kind === 'cat') closeCat(); }
+    });
+  }
+
+  /* ---------- Home ---------- */
+  function setupCard(){
+    return '<div class="callout"><b>Almost there.</b> Your sheet isn’t set up yet. Open it, choose <b>Salary Ledger → Set up (run once)</b>, then tap refresh here.</div>';
+  }
+  function homeHTML(d){
+    var s = d.summary, cur = period(d.currentPeriodId), h = '';
+    var fresh = !d.categories.length && !d.periods.some(function(p){ return p.hasIncome; });
+    if (fresh) {
+      h += '<div class="card"><p class="label">Start here</p><p class="h2">Three steps to get going</p><ol class="steps">' +
+        '<li>Open <b>Plan</b> and add your spending categories and funds.</li>' +
+        '<li>Open <b>Add</b> and record your salary for the current pay period.</li>' +
+        '<li>Log expenses as they happen. Add any loans under <b>Loans</b>.</li></ol></div>';
+    }
+    var pos = Math.max(s.received, 0.01);
+    var sp = clamp(s.spent / pos * 100, 0, 100), fd = clamp(Math.max(s.inFunds, 0) / pos * 100, 0, 100 - sp), un = Math.max(0, 100 - sp - fd);
+    h += '<div class="card"><p class="label">Total saved so far</p><p class="hero-num">' + peso(s.saved) + '</p>' +
+      '<p class="sub">Salary received minus spending, this year.</p>' +
+      '<div class="split" role="img" aria-label="Where your salary went"><span class="seg spent" style="width:' + sp + '%"></span><span class="seg funds" style="width:' + fd + '%"></span><span class="seg hatch" style="width:' + un + '%"></span></div>' +
+      '<ul class="legend3">' +
+      legendRow('spent', 'Spent', s.spent, sp) + legendRow('funds', 'Moved to funds', s.inFunds, fd) + legendRow('hatch', 'Not yet assigned', s.unassigned, un) + '</ul></div>';
+    h += '<div class="kpis"><div class="card"><p class="label">Received</p><p class="kpi-num">' + peso(s.received) + '</p></div>' +
+      '<div class="card"><p class="label">Loans owed</p><p class="kpi-num">' + peso(s.loanRemaining) + '</p></div></div>';
+    if (cur) {
+      h += '<div class="card"><p class="label">This pay period · ' + esc(perLabel(cur)) + '</p>' +
+        (cur.hasIncome ? '' : '<p class="sub">No salary recorded for this period yet.</p>') +
+        '<div class="tiles">' + tile('Income', cur.income) + tile('Planned', cur.planned) + tile('Left to plan', cur.hasIncome ? cur.income - cur.planned : 0) +
+        tile('Spent', cur.spent) + tile('Funds', cur.funds) + tile('Left', cur.unassigned) + '</div></div>';
+    }
+    var act = d.periods.filter(function(p){ return p.hasIncome || p.spent || p.funds; }).reverse().slice(0, 12);
+    if (act.length) {
+      h += '<div class="card"><p class="label">Pay periods</p>' + act.map(function(p){
+        return '<div style="padding:9px 0;border-top:1px solid var(--rule)"><div class="row-head"><p class="row-name">' + esc(perLabel(p)) + '</p><p class="row-amt">' + (p.hasIncome ? peso(p.income) : '—') + '</p></div>' +
+          '<p class="row-sub"><span>Spent ' + peso(p.spent) + ' · Funds ' + peso(p.funds) + '</span><span class="mono ' + (p.unassigned < 0 ? 'status bad' : '') + '">' + (p.hasIncome ? 'Left ' + peso(p.unassigned) : '') + '</span></p></div>';
+      }).join('') + '</div>';
+    }
+    return h;
+  }
+  function legendRow(cls, name, amt, pc){
+    return '<li><span class="sw ' + cls + '"></span><span>' + name + '</span><span class="amt">' + peso(amt) + '</span><span class="pc">' + Math.round(pc) + '%</span></li>';
+  }
+  function tile(k, v){ return '<p><span class="k">' + esc(k) + '</span><br><span class="v">' + peso(v) + '</span></p>'; }
+  function settingsHTML(d){
+    var next = d.years.length ? Math.max.apply(null, d.years) + 1 : new Date().getFullYear();
+    return '<form id="setForm" novalidate autocomplete="off">' +
+      '<label class="fld"><span class="label">App name</span><input id="sName" type="text" maxlength="30" value="' + esc(d.settings.appName) + '"></label>' +
+      '<label class="fld"><span class="label">Pay days</span><input id="sDays" type="text" value="' + esc(d.settings.payDays) + '" placeholder="15,EOM"></label>' +
+      '<p class="hint">Day numbers 1 to 28, or EOM for end of month. Applies to periods you add next, not existing ones.</p>' +
+      '<button class="btn2 solid" type="submit">Save settings</button></form>' +
+      '<form id="yrForm" novalidate autocomplete="off" style="margin-top:18px;padding-top:16px;border-top:1px dashed var(--rule-strong)"><div class="two" style="align-items:end">' +
+      '<label class="fld" style="margin:0"><span class="label">Add pay periods for year</span><input id="sYear" type="text" inputmode="numeric" maxlength="4" value="' + next + '"></label>' +
+      '<button class="btn2" type="submit">Add periods</button></div></form>';
+  }
+  var settingsOpen = false;
+  function fillSettings(){
+    if (!settingsOpen) return;
+    $('#settingsBody').innerHTML = data && data.setupDone ? settingsHTML(data) : setupCard();
+  }
+  function showGuide(show){
+    $('#settingsView').hidden = show; $('#guideView').hidden = !show;
+    $('#setTitle').textContent = show ? 'Guide' : 'Settings';
+    $('#setClose').setAttribute('aria-label', show ? 'Close guide' : 'Close settings');
+    $('#settingsModal .sheet').scrollTop = 0;
+    (show ? $('#guideBack') : $('#guideBtn')).focus();
+  }
+  function openSettings(){
+    showGuide(false);
+    settingsOpen = true; $('#settingsModal').hidden = false; fillSettings();
+    setTimeout(function(){ var f = $('#sName') || $('#setClose'); if (f) f.focus(); }, 30);
+  }
+  function closeSettings(){
+    settingsOpen = false; $('#settingsModal').hidden = true; $('#settingsBody').innerHTML = '';
+    var b = $('#settingsBtn'); if (b) b.focus();
+  }
+
+  /* ---------- Plan ---------- */
+  function ensurePlan(){
+    if ($('#planPer')) return;
+    $('#panel-plan').innerHTML =
+      '<div class="card"><label class="fld"><span class="label">Pay period</span><select id="planPer"></select></label>' +
+      '<label class="chk"><input id="planFuture" type="checkbox"><span>When I change a planned amount, also copy it to every later pay period</span></label>' +
+      '<div class="tiles" id="planTiles"></div></div>' +
+      '<div id="planList"></div>' +
+      '<div class="btn-row" style="margin:0 0 14px"><button class="btn2 solid" type="button" data-act="newcat" data-kind="SPENDING">New category</button>' +
+      '<button class="btn2" type="button" data-act="newcat" data-kind="FUND">New fund</button></div>' +
+      '<div id="catBox"></div>';
+  }
+  function fillPlan(){
+    ensurePlan();
+    var d = data, pairs = periodPairs();
+    if (!planPer || !period(planPer)) planPer = d.currentPeriodId;
+    var sel = $('#planPer'); setOptions(sel, pairs, planPer); planPer = sel.value || planPer;
+    var p = period(planPer), plan = d.plan[planPer] || {}, act = d.byCat[planPer] || {};
+    var all = d.categories.filter(function(c){ return !c.archived; });
+    var planned = all.reduce(function(s, c){ return s + (plan[c.id] || 0); }, 0);
+    $('#planTiles').innerHTML = tile('Income', p ? p.income : 0) + tile('Planned', planned) + tile('Left to plan', p && p.hasIncome ? p.income - planned : 0);
+    var h = '';
+    if (!all.length) h = '<div class="card"><p class="h2">No categories yet</p><p class="sub">Add the things you spend on, like Rent or Groceries, and any funds you save into. Then set how much to give each one every pay period.</p></div>';
+    [['SPENDING', 'Spending'], ['FUND', 'Funds']].forEach(function(k){
+      var list = all.filter(function(c){ return c.kind === k[0]; });
+      if (!list.length) return;
+      var groups = [], seen = {};
+      list.forEach(function(c){ var g = c.group || ''; if (!seen[g]) { seen[g] = 1; groups.push(g); } });
+      h += '<div class="card"><p class="label">' + k[1] + '</p>';
+      groups.forEach(function(g){
+        if (g || groups.length > 1) h += '<p class="grp">' + esc(g || 'Other') + '</p>';
+        list.filter(function(c){ return (c.group || '') === g; }).forEach(function(c){
+          var pl = plan[c.id] || 0, ac = act[c.id] || 0, w = pl > 0 ? clamp(ac / pl * 100, 0, 100) : (ac > 0 ? 100 : 0);
+          var over = k[0] === 'SPENDING' && ac > pl + 0.005;
+          var note = k[0] === 'FUND' ? 'Moved in ' + peso(ac) : (pl || ac ? (over ? '<span class="status bad">Over by ' + peso(ac - pl) + '</span>' : peso(ac) + ' of ' + peso(pl) + ' used') : 'Nothing planned');
+          h += '<div class="prow"><div><p class="row-name">' + esc(c.name) + '<button type="button" class="link" data-act="editcat" data-id="' + esc(c.id) + '">Edit</button></p>' +
+            '<div class="ruler"><span class="fill ' + (over ? 'over' : k[0] === 'FUND' ? 'funds' : 'spent') + '" data-w="' + w + '"></span></div>' +
+            '<p class="row-sub"><span>' + note + '</span></p></div>' +
+            '<input class="plan-in" type="text" inputmode="decimal" data-cat="' + esc(c.id) + '" value="' + (pl ? nf.format(pl) : '') + '" placeholder="0.00" aria-label="Planned for ' + esc(c.name) + '"></div>';
+        });
+      });
+      h += '</div>';
+    });
+    var arch = d.categories.filter(function(c){ return c.archived; });
+    if (arch.length) h += '<div class="card"><p class="label">Archived</p>' + arch.map(function(c){
+      return '<div class="row-head" style="padding:6px 0"><p class="row-name">' + esc(c.name) + '</p><button type="button" class="btn2" data-act="restorecat" data-id="' + esc(c.id) + '">Restore</button></div>';
+    }).join('') + '</div>';
+    $('#planList').innerHTML = h;
+    fillCatForm();
+  }
+  function savePlanLine(inp){
+    var raw = inp.value.trim(), amt = raw === '' ? 0 : parseAmt(raw);
+    if (isNaN(amt) || amt < 0) { toast('Planned amount must be a number, zero or more.', true); return; }
+    var cat = byId(data.categories, inp.getAttribute('data-cat'));
+    mutate('setBudget', [{ periodId: planPer, categoryId: inp.getAttribute('data-cat'), amount: amt, applyToFuture: $('#planFuture').checked }], function(res, err){
+      if (err) toast(err, true); else toast('Planned ' + peso(amt) + ' for ' + (cat ? cat.name : 'category') + '.');
+    });
+  }
+
+  /* category form (new / edit) */
+  function openCat(draft){ catDraft = draft; fillCatForm(); var b = $('#catBox'); if (b && b.scrollIntoView) b.scrollIntoView({ block: 'nearest' }); setTimeout(function(){ var n = $('#cName'); if (n) n.focus(); }, 50); }
+  function closeCat(){ catDraft = null; fillCatForm(); }
+  function fillCatForm(){
+    var box = $('#catBox'); if (!box) return;
+    if (!catDraft) { box.innerHTML = ''; return; }
+    var dr = catDraft, edit = !!dr.id, fund = dr.kind === 'FUND';
+    box.innerHTML = '<form class="card" id="catForm" novalidate autocomplete="off">' +
+      '<p class="label">' + (edit ? 'Edit ' : 'New ') + (fund ? 'fund' : 'spending category') + '</p>' +
+      '<label class="fld"><span class="label">Name</span><input id="cName" type="text" maxlength="40" value="' + esc(dr.name || '') + '"></label>' +
+      '<label class="fld"><span class="label">Group (optional)</span><input id="cGroup" type="text" maxlength="30" value="' + esc(dr.group || '') + '" placeholder="e.g. Home, School"></label>' +
+      (fund ? '<div class="two"><label class="fld"><span class="label">Target (₱)</span><input id="cTarget" type="text" inputmode="decimal" value="' + (dr.target ? nf.format(dr.target) : '') + '" placeholder="optional"></label>' +
+        '<label class="fld"><span class="label">Target date</span><input id="cTDate" type="date" value="' + esc(dr.targetDate || '') + '"></label></div>' : '') +
+      (edit ? '<label class="chk"><input id="cArch" type="checkbox"' + (dr.archived ? ' checked' : '') + '><span>Archive (hide it from lists, keep its history)</span></label>' : '') +
+      '<p class="form-msg" id="catMsg" role="alert" aria-live="polite"></p>' +
+      '<div class="btn-row"><button class="btn2 solid" type="submit">' + (edit ? 'Save changes' : 'Create') + '</button>' +
+      '<button class="btn2" type="button" data-act="catcancel">Cancel</button>' + (edit ? delBtn('cat', dr.id, dr.name) : '') + '</div></form>';
+  }
+  function submitCat(e){
+    e.preventDefault(); if (saving) return;
+    var dr = catDraft, fund = dr.kind === 'FUND';
+    var rec = { cid: dr.id ? undefined : cidFor('cat'), id: dr.id || undefined, kind: dr.kind, name: $('#cName').value, group: $('#cGroup').value,
+      archived: dr.id ? $('#cArch').checked : false };
+    if (fund) {
+      var t = $('#cTarget').value.trim(); var tv = t === '' ? 0 : parseAmt(t);
+      if (isNaN(tv)) { setMsg('catMsg', 'Target must be a number.', 'err'); return; }
+      rec.target = tv; rec.targetDate = $('#cTDate').value;
+    }
+    mutate('saveCategory', [rec], function(res, err){
+      if (err) { setMsg('catMsg', err, 'err'); return; }
+      delete cids.cat; toast((dr.id ? 'Saved ' : 'Created ') + rec.name.trim() + '.'); closeCat();
+    });
+  }
+
+  /* ---------- Add ---------- */
+  function ensureAdd(){
+    if ($('#addForm')) return;
+    $('#panel-add').innerHTML =
+      '<form class="card" id="addForm" novalidate autocomplete="off">' +
+        '<div class="seg-ctl" role="radiogroup" aria-label="Record type">' +
+          ['Expense','Fund','Income','Loan'].map(function(t){
+            return '<button type="button" class="seg-btn" role="radio" data-act="addtype" data-v="' + t + '" aria-checked="' + (t === addType) + '">' + (t === 'Loan' ? 'Loan pay' : t) + '</button>';
+          }).join('') + '</div>' +
+        '<p class="callout" id="addNeed" hidden></p>' +
+        '<label class="fld"><span class="label">Amount</span><span class="amt-wrap"><b aria-hidden="true">₱</b><input id="fAmount" type="text" inputmode="decimal" placeholder="0.00" aria-label="Amount in pesos"></span></label>' +
+        '<p class="hint" id="fHint" hidden></p>' +
+        '<label class="fld" id="wDir" hidden><span class="label">Fund action</span><select id="fDir"><option value="IN">Deposit into fund</option><option value="OUT">Withdraw from fund</option></select></label>' +
+        '<label class="fld" id="wKind" hidden><span class="label">Income type</span><select id="fKind"><option value="SALARY">Salary</option><option value="BONUS">Bonus</option><option value="OTHER">Other</option></select></label>' +
+        '<label class="fld" id="wSource" hidden><span class="label">Source (optional)</span><input id="fSource" type="text" maxlength="60" placeholder="e.g. employer"></label>' +
+        '<label class="fld" id="wLoan" hidden><span class="label">Loan</span><select id="fLoan"></select></label>' +
+        '<label class="chk" id="wAlso" hidden><input id="fAlso" type="checkbox" checked><span>Also count it as spending in a category</span></label>' +
+        '<label class="fld" id="wCat"><span class="label" id="lCat">Category</span><select id="fCat"></select></label>' +
+        '<label class="fld" id="wPeriod"><span class="label">Pay period</span><select id="fPeriod"></select></label>' +
+        '<label class="fld"><span class="label">Date</span><input id="fDate" type="date"></label>' +
+        '<label class="fld"><span class="label">Note (optional)</span><input id="fNote" type="text" maxlength="200" placeholder="e.g. Meralco, groceries"></label>' +
+        '<p class="form-msg" id="addMsg" role="alert" aria-live="polite"></p>' +
+        '<button class="go" id="addGo" type="submit">Save entry</button>' +
+      '</form><div class="card" id="recent"></div>';
+  }
+  function show(id, on){ var el = $('#' + id); if (el) el.hidden = !on; }
+  function fillAdd(){
+    ensureAdd();
+    var d = data, t = addType;
+    $$('#addForm .seg-btn').forEach(function(b){ b.setAttribute('aria-checked', b.getAttribute('data-v') === t ? 'true' : 'false'); });
+    setOptions($('#fPeriod'), periodPairs(), d.currentPeriodId);
+    if (!$('#fDate').value) $('#fDate').value = d.today;
+    var need = '', loansOpen = d.loans.filter(function(l){ return l.status !== 'PAID'; });
+    var spend = cats('SPENDING'), funds = cats('FUND');
+    var also = t === 'Loan' && $('#fAlso').checked;
+    show('wDir', t === 'Fund'); show('wKind', t === 'Income'); show('wSource', t === 'Income');
+    show('wLoan', t === 'Loan'); show('wAlso', t === 'Loan' && spend.length > 0);
+    show('wCat', t === 'Expense' || t === 'Fund' || (t === 'Loan' && also && spend.length > 0));
+    show('wPeriod', t !== 'Loan' || (also && spend.length > 0));
+    $('#lCat').textContent = t === 'Fund' ? 'Fund' : (t === 'Loan' ? 'Count it under' : 'Category');
+    if (t === 'Expense') { setOptions($('#fCat'), spend.map(function(c){ return [c.id, c.name]; })); if (!spend.length) need = 'Add a spending category first (Plan tab → New category).'; }
+    if (t === 'Fund') { setOptions($('#fCat'), funds.map(function(c){ return [c.id, c.name]; })); if (!funds.length) need = 'Add a fund first (Plan tab → New fund).'; }
+    if (t === 'Loan') {
+      setOptions($('#fCat'), spend.map(function(c){ return [c.id, c.name]; }));
+      setOptions($('#fLoan'), loansOpen.map(function(l){ return [l.id, l.name]; }));
+      if (!loansOpen.length) need = 'No loan to pay. Add one in the Loans tab.';
+    }
+    var nb = $('#addNeed'); nb.hidden = !need; nb.textContent = need;
+    $('#addGo').disabled = !!need;
+    var hint = $('#fHint'), amt = $('#fAmount');
+    hint.hidden = true;
+    if (t === 'Loan' && !need) {
+      var l = byId(d.loans, $('#fLoan').value);
+      if (l && l.next) { hint.hidden = false; hint.textContent = 'Next due: #' + l.next.seq + ' · ' + fmtDate(l.next.due) + ' · ' + peso(l.next.left) + ' left · ' + peso(l.remaining) + ' owed in total'; }
+    }
+    renderRecent();
+  }
+  function prefillLoan(){
+    var l = byId(data.loans, $('#fLoan').value);
+    if (l && l.next && !$('#fAmount').value) $('#fAmount').value = nf.format(l.next.left);
+  }
+  function renderRecent(){
+    var d = data, rows = d.recent.map(function(t){
+      return '<div class="rec"><p class="rec-name">' + esc(t.title) + '</p><p class="rec-amt' + (t.dir === 'in' ? ' in' : '') + '">' + (t.dir === 'in' ? '+' : '') + peso(t.amount) + '</p>' +
+        '<p class="rec-sub">' + esc(fmtDate(t.date) + ' · ' + t.sub) + '</p>' + delBtn(t.kind, t.id, t.title + ' ' + peso(t.amount)) + '</div>';
+    }).join('');
+    $('#recent').innerHTML = '<p class="label">Recent entries</p>' + (rows || '<p class="sub">Nothing yet. Your first entry will show up here.</p>');
+  }
+  function submitAdd(e){
+    e.preventDefault(); if (saving || !data || !data.setupDone) return;
+    var amount = parseAmt($('#fAmount').value);
+    if (!(amount > 0)) { setMsg('addMsg', 'Enter an amount above zero.', 'err'); $('#fAmount').focus(); return; }
+    var t = addType, base = { cid: cidFor('add'), amount: amount, date: $('#fDate').value, note: $('#fNote').value, periodId: $('#fPeriod').value };
+    var fn, rec, label;
+    if (t === 'Expense') { fn = 'addTransaction'; rec = Object.assign(base, { type: 'EXPENSE', categoryId: $('#fCat').value }); label = (byId(data.categories, rec.categoryId) || {}).name; }
+    else if (t === 'Fund') { fn = 'addTransaction'; rec = Object.assign(base, { type: $('#fDir').value === 'OUT' ? 'FUND_OUT' : 'FUND_IN', categoryId: $('#fCat').value }); label = (byId(data.categories, rec.categoryId) || {}).name; }
+    else if (t === 'Income') { fn = 'addIncome'; rec = Object.assign(base, { kind: $('#fKind').value, source: $('#fSource').value }); label = $('#fSource').value.trim() || 'Income'; }
+    else { fn = 'addLoanPayment'; rec = Object.assign(base, { loanId: $('#fLoan').value, alsoSpend: !$('#wAlso').hidden && $('#fAlso').checked, categoryId: $('#fCat').value }); label = (byId(data.loans, rec.loanId) || {}).name; }
+    var go = $('#addGo'); go.disabled = true; go.textContent = 'Saving…';
+    mutate(fn, [rec], function(res, err){
+      var g = $('#addGo'); if (g) { g.disabled = false; g.textContent = 'Save entry'; }
+      if (err) { setMsg('addMsg', err, 'err'); return; }
+      delete cids.add; $('#fAmount').value = ''; $('#fNote').value = '';
+      setMsg('addMsg', (res.duplicate ? 'Already saved: ' : 'Saved ') + peso(amount) + ' · ' + (label || ''), 'ok');
+      fillAdd(); $('#fAmount').focus();
+    });
+  }
+
+  /* ---------- Funds ---------- */
+  function fundsHTML(d){
+    var funds = cats('FUND');
+    if (!funds.length) return '<div class="card"><p class="h2">No funds yet</p><p class="sub">A fund is money you set aside, like an emergency fund or a trip. Create one and track it toward a target.</p>' +
+      '<div class="btn-row"><button class="btn2 solid" type="button" data-act="newfund">New fund</button></div></div>';
+    var total = funds.reduce(function(s, c){ return s + c.actual; }, 0);
+    var h = '<div class="card"><p class="label">Total in funds</p><p class="big-num">' + peso(total) + '</p><div class="btn-row"><button class="btn2" type="button" data-act="newfund">New fund</button></div></div>';
+    funds.forEach(function(c){
+      var w = c.target > 0 ? clamp(c.actual / c.target * 100, 0, 100) : 0, delta = c.actual - c.planToDate;
+      h += '<div class="card"><div class="row-head"><p class="row-name">' + esc(c.name) + '</p><p class="row-amt">' + peso(c.actual) + '</p></div>' +
+        (c.target > 0 ? '<div class="ruler"><span class="fill funds" data-w="' + w + '"></span></div><p class="row-sub"><span>' + Math.round(w) + '% of ' + peso(c.target) + (c.targetDate ? ' by ' + esc(fmtLong(c.targetDate)) : '') + '</span><span class="mono">' + peso(Math.max(0, c.target - c.actual)) + ' to go</span></p>' : '<p class="sub">No target set.</p>') +
+        (c.planToDate > 0 ? '<p class="row-sub" style="margin-top:6px"><span>Planned so far ' + peso(c.planToDate) + '</span><span class="status ' + (delta < -0.005 ? 'bad' : 'ok') + '">' + (delta < -0.005 ? 'Behind ' + peso(-delta) : 'On track') + '</span></p>' : '') +
+        '<div class="btn-row"><button type="button" class="btn2" data-act="editcat" data-id="' + esc(c.id) + '">Edit</button></div></div>';
+    });
+    return h;
+  }
+
+  /* ---------- Loans ---------- */
+  function ensureLoans(){
+    if ($('#loanList')) return;
+    $('#panel-loans').innerHTML = '<div id="loanTop"></div><div id="loanFormBox"></div><div id="loanList"></div>';
+  }
+  var FREQ = [['SEMI_MONTHLY','Twice a month (15th & end)'],['MONTHLY','Monthly'],['BIWEEKLY','Every 2 weeks'],['WEEKLY','Weekly']];
+  function fillLoans(){
+    ensureLoans();
+    var d = data, owed = d.summary.loanRemaining;
+    $('#loanTop').innerHTML = '<div class="card"><p class="label">Total owed</p><p class="big-num">' + peso(owed) + '</p>' +
+      '<div class="btn-row"><button class="btn2 solid" type="button" data-act="newloan">New loan</button></div></div>';
+    var fb = $('#loanFormBox');
+    if (!loanOpen) fb.innerHTML = '';
+    else if (!$('#loanForm')) {
+      fb.innerHTML = '<form class="card" id="loanForm" novalidate autocomplete="off"><p class="label">New loan</p>' +
+        '<label class="fld"><span class="label">Name</span><input id="lName" type="text" maxlength="40" placeholder="e.g. Billease 5k"></label>' +
+        '<label class="fld"><span class="label">Lender (optional)</span><input id="lLender" type="text" maxlength="40"></label>' +
+        '<div class="two"><label class="fld"><span class="label">Borrowed (₱)</span><input id="lPrin" type="text" inputmode="decimal"></label>' +
+        '<label class="fld"><span class="label">Total to repay (₱)</span><input id="lTotal" type="text" inputmode="decimal" placeholder="same"></label></div>' +
+        '<div class="two"><label class="fld"><span class="label">Installments</span><input id="lCount" type="text" inputmode="numeric" maxlength="3"></label>' +
+        '<label class="fld"><span class="label">First due date</span><input id="lFirst" type="date"></label></div>' +
+        '<label class="fld"><span class="label">Paid</span><select id="lFreq">' + FREQ.map(function(f){ return '<option value="' + f[0] + '">' + f[1] + '</option>'; }).join('') + '</select></label>' +
+        '<p class="hint" id="lPreview">&nbsp;</p><p class="form-msg" id="loanMsg" role="alert" aria-live="polite"></p>' +
+        '<div class="btn-row"><button class="btn2 solid" type="submit">Create loan</button><button class="btn2" type="button" data-act="loancancel">Cancel</button></div></form>';
+      $('#lFirst').value = d.today;
+    }
+    var h = '';
+    if (!d.loans.length) h = '<div class="card"><p class="h2">No loans yet</p><p class="sub">Add a loan with its total and number of installments. The schedule is built for you, and you record each payment as you make it.</p></div>';
+    d.loans.forEach(function(l){
+      var paid = l.status === 'PAID';
+      h += '<div class="card"><div class="row-head"><p class="row-name">' + esc(l.name) + (l.lender ? ' <span class="sub">· ' + esc(l.lender) + '</span>' : '') + '</p>' +
+        (paid ? '<span class="badge paid">Paid</span>' : l.overdue ? '<span class="badge bad">' + l.overdue + ' overdue</span>' : '') + '</div>' +
+        '<div class="ruler"><span class="fill loan" data-w="' + clamp(l.pct, 0, 100) + '"></span></div>' +
+        '<p class="row-sub"><span>' + peso(l.paid) + ' paid of ' + peso(l.total) + '</span><span class="mono">' + peso(l.remaining) + ' left</span></p>' +
+        (l.next ? '<p class="sub" style="margin-top:8px">Next: #' + l.next.seq + ' of ' + l.count + ' · ' + esc(fmtLong(l.next.due)) + ' · ' + peso(l.next.left) + '</p>' : '') +
+        '<details class="inst"><summary>Installments (' + l.paymentsLeft + ' left)</summary>' + l.installments.map(function(i){
+          var cls = i.status === 'PAID' ? 'paid' : i.status === 'OVERDUE' ? 'bad' : '';
+          return '<div class="inst-row"><span class="mono">' + i.seq + '</span><span>' + esc(fmtLong(i.due)) + '</span><span class="mono">' + peso(i.status === 'PAID' ? i.amount : i.left) + '</span><span class="badge ' + cls + '">' + i.status.toLowerCase() + '</span></div>';
+        }).join('') + '</details>' +
+        (l.payments.length ? '<details class="inst"><summary>Payments (' + l.payments.length + ')</summary>' + l.payments.map(function(p){
+          return '<div class="rec"><p class="rec-name">' + esc(fmtLong(p.date)) + '</p><p class="rec-amt">' + peso(p.amount) + '</p><p class="rec-sub">' + esc([p.counted ? 'Counted as spending' : '', p.note].filter(Boolean).join(' · ')) + '</p>' + delBtn('loanpay', p.id, 'payment ' + peso(p.amount)) + '</div>';
+        }).join('') + '</details>' : '') +
+        '<div class="btn-row">' + (paid ? '' : '<button class="btn2 solid" type="button" data-act="payloan" data-id="' + esc(l.id) + '">Record payment</button>') +
+        (l.payments.length ? '' : delBtn('loan', l.id, l.name)) + '</div></div>';
+    });
+    $('#loanList').innerHTML = h;
+  }
+  function loanPreview(){
+    var p = parseAmt($('#lPrin').value), t = $('#lTotal').value.trim() === '' ? p : parseAmt($('#lTotal').value), n = parseInt($('#lCount').value, 10), el = $('#lPreview');
+    el.innerHTML = (t > 0 && n > 0) ? '≈ ' + peso(t / n) + ' per installment' + (t > p ? ' · ' + peso(t - p) + ' interest and fees' : '') : '&nbsp;';
+  }
+  function submitLoan(e){
+    e.preventDefault(); if (saving) return;
+    var p = parseAmt($('#lPrin').value), tr = $('#lTotal').value.trim();
+    if (isNaN(p)) { setMsg('loanMsg', 'Enter the amount you borrowed.', 'err'); return; }
+    var rec = { cid: cidFor('loan'), name: $('#lName').value, lender: $('#lLender').value, principal: p, total: tr === '' ? '' : parseAmt(tr),
+      count: $('#lCount').value.trim(), frequency: $('#lFreq').value, firstDue: $('#lFirst').value };
+    if (tr !== '' && isNaN(rec.total)) { setMsg('loanMsg', 'Total to repay must be a number.', 'err'); return; }
+    mutate('saveLoan', [rec], function(res, err){
+      if (err) { setMsg('loanMsg', err, 'err'); return; }
+      delete cids.loan; loanOpen = false; toast('Loan created with its schedule.'); fillLoans();
+    });
+  }
+
+  /* ---------- render / tabs ---------- */
+  function skeleton(){
+    return '<div class="card"><div class="skel" style="width:40%"></div><div class="skel" style="height:44px;width:80%"></div><div class="skel" style="width:60%"></div></div>';
+  }
+  function render(){
+    if (!data) { $$('.panel').forEach(function(p){ p.innerHTML = skeleton(); }); return; }
+    if (!data.setupDone) { $$('.panel').forEach(function(p){ p.innerHTML = setupCard(); }); $('#eyebrow').textContent = data.app.name; fillSettings(); return; }
+    $('#panel-home').innerHTML = homeHTML(data);
+    fillPlan(); fillAdd();
+    $('#panel-funds').innerHTML = fundsHTML(data);
+    fillLoans(); fillSettings();
+    var cur = period(data.currentPeriodId);
+    $('#eyebrow').textContent = data.app.name + (cur ? ' · ' + perLabel(cur) : '');
+    $('#lockName').textContent = data.app.name;
+    showTab(tab, true);
+  }
+  function reveal(panel){
+    var fills = $$('.fill', panel);
+    if (reduced) { fills.forEach(function(f){ f.style.width = f.getAttribute('data-w') + '%'; }); return; }
+    fills.forEach(function(f){ f.style.width = '0'; });
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){ fills.forEach(function(f){ f.style.width = f.getAttribute('data-w') + '%'; }); }); });
+  }
+  function showTab(name, keepScroll){
+    tab = name; store.set('sl2_tab', name);
+    $$('.tab').forEach(function(t){ var on = t.getAttribute('data-tab') === name; t.setAttribute('aria-selected', on ? 'true' : 'false'); t.tabIndex = on ? 0 : -1; });
+    $$('.panel').forEach(function(p){ p.classList.toggle('on', p.id === 'panel-' + name); });
+    $('#screenTitle').textContent = TITLES[name];
+    if (!keepScroll) $('#main').scrollTop = 0;
+    if (data) reveal($('#panel-' + name));
+  }
+
+  /* ---------- loading / errors / PIN ---------- */
+  function showBanner(msg){ var b = $('#banner'); b.innerHTML = '<span>' + esc(msg) + '</span><button type="button" id="retry">Retry</button>'; b.hidden = false; }
+  function hideBanner(){ $('#banner').hidden = true; }
+  function showLock(msg){ $('#lock').hidden = false; $('#pinErr').textContent = msg || ''; $('#pin').value = ''; setTimeout(function(){ $('#pin').focus(); }, 50); }
+  function hideLock(){ $('#lock').hidden = true; }
+  function load(){
+    if (busy) return Promise.resolve();
+    busy = true; $('#refresh').classList.add('spin');
+    return call('getState', pin).then(function(d){ applyState(d); }).catch(function(err){
+      var m = String((err && err.message) || err);
+      if (/BAD_PIN/.test(m)) { pin = ''; store.del('sl2_pin'); showLock('That PIN isn’t right.'); }
+      else if (/PIN_REQUIRED/.test(m)) showLock('');
+      else if (/LOCKED/.test(m)) showLock('Too many wrong tries. Wait 10 minutes, then try again.');
+      else showBanner(data ? 'Couldn’t refresh. Showing the last data you loaded.' : 'Couldn’t load your sheet. ' + m);
+    }).then(function(){ busy = false; $('#refresh').classList.remove('spin'); });
+  }
+
+  /* ---------- events ---------- */
+  document.addEventListener('click', function(e){
+    var t = e.target.closest ? e.target.closest('[data-tab],[data-act]') : null;
+    if (!t) return;
+    if (t.hasAttribute('data-tab')) { showTab(t.getAttribute('data-tab')); return; }
+    var act = t.getAttribute('data-act'), id = t.getAttribute('data-id');
+    if (act === 'opensettings') openSettings();
+    else if (act === 'closesettings') closeSettings();
+    else if (act === 'openguide') showGuide(true);
+    else if (act === 'backsettings') showGuide(false);
+    else if (act === 'addtype') { addType = t.getAttribute('data-v'); delete cids.add; fillAdd(); if (addType === 'Loan') prefillLoan(); }
+    else if (act === 'del') onDelete(t.getAttribute('data-kind'), id);
+    else if (act === 'newcat') openCat({ kind: t.getAttribute('data-kind') });
+    else if (act === 'newfund') { showTab('plan'); openCat({ kind: 'FUND' }); }
+    else if (act === 'editcat') { var c = byId(data.categories, id); if (c) { showTab('plan'); openCat({ id: c.id, kind: c.kind, name: c.name, group: c.group, target: c.target, targetDate: c.targetDate, archived: c.archived }); } }
+    else if (act === 'restorecat') { var r = byId(data.categories, id); mutate('saveCategory', [{ id: id, name: r.name, group: r.group, archived: false, target: r.target, targetDate: r.targetDate }], function(res, err){ toast(err || 'Restored ' + r.name + '.', !!err); }); }
+    else if (act === 'catcancel') closeCat();
+    else if (act === 'newloan') { loanOpen = true; fillLoans(); var lf = $('#loanFormBox'); if (lf.scrollIntoView) lf.scrollIntoView({ block: 'nearest' }); setTimeout(function(){ var n = $('#lName'); if (n) n.focus(); }, 50); }
+    else if (act === 'loancancel') { loanOpen = false; fillLoans(); }
+    else if (act === 'payloan') { addType = 'Loan'; showTab('add'); fillAdd(); $('#fLoan').value = id; $('#fAmount').value = ''; fillAdd(); prefillLoan(); }
+  });
+  document.addEventListener('change', function(e){
+    var t = e.target; if (!t || !data) return;
+    if (t.classList && t.classList.contains('plan-in')) savePlanLine(t);
+    else if (t.id === 'planPer') { planPer = t.value; fillPlan(); reveal($('#panel-plan')); }
+    else if (t.id === 'fAlso') fillAdd();
+    else if (t.id === 'fLoan') { $('#fAmount').value = ''; fillAdd(); prefillLoan(); }
+  });
+  document.addEventListener('input', function(e){
+    var f = e.target && e.target.closest ? e.target.closest('form') : null; if (!f) return;
+    if (f.id === 'addForm') delete cids.add; else if (f.id === 'catForm') delete cids.cat; else if (f.id === 'loanForm') { delete cids.loan; loanPreview(); }
+  });
+  document.addEventListener('submit', function(e){
+    var id = e.target && e.target.id;
+    if (id === 'addForm') submitAdd(e);
+    else if (id === 'catForm') submitCat(e);
+    else if (id === 'loanForm') submitLoan(e);
+    else if (id === 'setForm') {
+      e.preventDefault();
+      mutate('saveSettings', [{ appName: $('#sName').value, payDays: $('#sDays').value }], function(res, err){ toast(err || 'Settings saved.', !!err); });
+    } else if (id === 'yrForm') {
+      e.preventDefault(); var y = $('#sYear').value.trim();
+      mutate('generatePeriods', [y], function(res, err){ toast(err || 'Pay periods for ' + y + ' are ready.', !!err); });
+    }
+  });
+  $('#refresh').addEventListener('click', load);
+  $('#settingsModal').addEventListener('click', function(e){ if (e.target === this) closeSettings(); });
+  document.addEventListener('keydown', function(e){
+    if (!settingsOpen) return;
+    if (e.key === 'Escape') { e.preventDefault(); closeSettings(); return; }
+    if (e.key !== 'Tab') return;
+    var f = $$('#settingsModal button, #settingsModal input, #settingsModal select').filter(function(x){ return !x.disabled && x.getClientRects().length > 0; });
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+  $('#banner').addEventListener('click', function(e){ if (e.target.id === 'retry') load(); });
+  $('#lock').addEventListener('submit', function(e){
+    e.preventDefault();
+    var v = $('#pin').value.trim();
+    if (!v) { $('#pinErr').textContent = 'Type your PIN first.'; return; }
+    pin = v; store.set('sl2_pin', v); $('#pinErr').textContent = ''; load();
+  });
+  $('.tabs').addEventListener('keydown', function(e){
+    var keys = Object.keys(TITLES), i = keys.indexOf(tab);
+    if (e.key === 'ArrowRight') i = (i + 1) % keys.length;
+    else if (e.key === 'ArrowLeft') i = (i + keys.length - 1) % keys.length;
+    else return;
+    e.preventDefault(); showTab(keys[i]); $('#tab-' + keys[i]).focus();
+  });
+
+  /* ---------- boot ---------- */
+  try { var c0 = JSON.parse(store.get('sl2_cache') || 'null'); if (c0 && c0.setupDone) data = c0; } catch(e){}
+  render();
+  showTab(tab, true);
+  load();
+})();
+</script>
+</body>
+</html>

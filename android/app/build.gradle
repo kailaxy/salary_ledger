@@ -1,0 +1,26 @@
+plugins { id 'com.android.application' }
+
+def ledgerUrl = providers.environmentVariable('LEDGER_WEB_APP_URL').orElse('').get().trim()
+if (!ledgerUrl) {
+    ledgerUrl = 'https://script.google.com/macros/s/AKfycbz0-dfJkKtvFhAAGehlzw6kaIqjKPUqpjgmaRO0ZqBLrk3PgvTNv23SSyklYUARnbov/exec'
+}
+if (ledgerUrl && !(ledgerUrl ==~ /https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec/)) {
+    throw new GradleException('LEDGER_WEB_APP_URL must be an HTTPS script.google.com/macros/s/.../exec deployment URL')
+}
+android {
+    namespace 'com.kailaxy.salaryledger'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'com.kailaxy.salaryledger'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '0.1.0'
+        buildConfigField 'String', 'LEDGER_WEB_APP_URL', '"' + ledgerUrl + '"'
+    }
+    buildFeatures { buildConfig true }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
