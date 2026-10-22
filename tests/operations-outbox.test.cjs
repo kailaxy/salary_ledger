@@ -39,7 +39,7 @@ test('conflicting bundle blocks descendant projection; explicit discard makes de
  await e.local.discardConflict(e.s.ledgerId,a.p.mutationId);entries=await e.local.list(e.s.ledgerId);assert.equal(entries.length,1);assert.equal(entries[0].status,'conflict');assert.equal(entries[0].dependsOn,null);await e.local.discardConflict(e.s.ledgerId,b.p.mutationId);assert.equal((await e.local.list(e.s.ledgerId)).length,0);
 });
 test('stale confirmations and unprepared backend commit no financial row/outbox item',async()=>{
- const e=await setup(),a=operation(e,'saveSettings',[{appName:'Offline',payDays:'15,EOM'}]);await assert.rejects(e.local.enqueue(a.p,'stale'),/changed/);delete e.s.capabilities.operationSyncVersion;await e.local.save(e.s);await assert.rejects(e.local.enqueue(a.p,a.revision),/Update Apps Script/);assert.equal((await e.local.list(e.s.ledgerId)).length,0);
+ const e=await setup(),a=operation(e,'saveSettings',[{appName:'Offline',payDays:'15,EOM'}]);await assert.rejects(e.local.enqueue(a.p,'stale'),/changed/);delete e.s.capabilities.operationSyncVersion;await e.local.save(e.s);await assert.rejects(e.local.enqueue(a.p,a.revision),/Refresh online/);assert.equal((await e.local.list(e.s.ledgerId)).length,0);
 });
 
 test('quota failure while writing outbox or audit rolls back the entire confirmation',async()=>{

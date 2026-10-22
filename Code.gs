@@ -357,9 +357,12 @@ function getLedgerSnapshot(pin) {
         }).join('') };
       });
     });
-    let syncVersion = 0;
-    if (typeof syncJournal_ === 'function') { try { syncJournal_(ss); syncVersion = 1; } catch (e) { /* Explicit preparation is required. */ } }
+    let syncVersion = 0, syncIssue = '';
+    if (typeof syncJournal_ === 'function') { try { syncJournal_(ss); syncVersion = 1; } catch (e) { syncIssue = 'Prepare reliable sync from the Salary Ledger menu in your spreadsheet; the sync journal is missing or incompatible.'; } }
+    if (!syncVersion && !syncIssue) syncIssue = 'The deployed Apps Script is missing Sync.gs.';
+    const operationIssue = syncIssue || (typeof LedgerOperations === 'undefined' ? 'The deployed Apps Script cannot load Operations.gs.' : typeof loanSyncRow_ !== 'function' ? 'The deployed Apps Script is missing the current LoanSync.gs.' : typeof operationSyncVersion_ !== 'function' ? 'The deployed Apps Script is missing OperationSync.gs.' : '');
     return {
+      syncDiagnostics: { operationIssue: operationIssue },
       capabilities: {recordSyncVersion: syncVersion, fundSyncVersion: syncVersion && typeof fundSyncVersion_ === 'function' ? fundSyncVersion_() : 0, loanSyncVersion: syncVersion && typeof loanSyncVersion_ === 'function' ? loanSyncVersion_() : 0, operationSyncVersion: syncVersion && typeof operationSyncVersion_ === 'function' ? operationSyncVersion_() : 0},
       formatVersion: 1, ledgerId: ss.getId(), capturedAt: now.toISOString(),
       timezone: TZ_, currency: settings.currency || '₱', minorUnitScale: 2,

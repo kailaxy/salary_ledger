@@ -968,7 +968,7 @@
 <!-- OPERATIONS:START -->
 <script>
 /* Shared deterministic operation planner. Embedded verbatim in Index.html; no network or model. */
-(function(root){
+var LedgerOperations = (function(){
 'use strict';
 var schemas={SETTINGS:['key','value'],PAY_PERIODS:['period_id','label','start_date','pay_date','is_closed'],INCOME:['income_id','period_id','received_date','amount','kind','source','note'],CATEGORIES:['category_id','name','kind','group_name','sort_order','is_archived'],FUND_GOALS:['category_id','target_amount','target_date'],BUDGET_LINES:['line_id','period_id','category_id','planned_amount'],TRANSACTIONS:['txn_id','period_id','category_id','type','txn_date','amount','note'],LOANS:['loan_id','name','lender','principal','total_payable','start_date','installment_amount','frequency','installment_count','status'],LOAN_INSTALLMENTS:['installment_id','loan_id','seq_no','due_date','amount_due'],LOAN_PAYMENTS:['payment_id','loan_id','installment_id','txn_id','paid_date','amount','note']};
 var guards={saveCategory:['CATEGORIES','FUND_GOALS','TRANSACTIONS','BUDGET_LINES'],deleteCategory:['CATEGORIES','FUND_GOALS','TRANSACTIONS','BUDGET_LINES'],setBudget:['PAY_PERIODS','CATEGORIES','BUDGET_LINES'],saveLoan:['LOANS','LOAN_INSTALLMENTS','LOAN_PAYMENTS'],deleteLoan:['LOANS','LOAN_INSTALLMENTS','LOAN_PAYMENTS'],editRecord:['INCOME','TRANSACTIONS','LOAN_PAYMENTS','LOANS','LOAN_INSTALLMENTS','CATEGORIES','PAY_PERIODS'],deleteRecord:['INCOME','TRANSACTIONS','LOAN_PAYMENTS','LOANS','LOAN_INSTALLMENTS','CATEGORIES','PAY_PERIODS'],saveSettings:['SETTINGS'],generatePeriods:['SETTINGS','PAY_PERIODS']};
@@ -1206,8 +1206,8 @@ function view(snapshot) {
   };
 }
 
-root.LedgerOperations={schemas:schemas,hash:hash,domain:domain,context:context,plan:plan,apply:apply,view:view,receipt:receipt,pk:pk};
-})(typeof window!=='undefined'?window:globalThis);
+return {schemas:schemas,hash:hash,domain:domain,context:context,plan:plan,apply:apply,view:view,receipt:receipt,pk:pk};
+})();
 </script>
 <!-- OPERATIONS:END -->
 
@@ -1226,7 +1226,7 @@ root.LedgerOperations={schemas:schemas,hash:hash,domain:domain,context:context,p
   function round(n){return Math.round((n+Number.EPSILON)*100)/100;}
   function operationRevision(snapshot,entries,action){return root.LedgerOperations.context(project(snapshot,entries),action)+'|'+order(entries).map(function(e){return e.mutationId;}).join('|');}
   function validateOperation(snapshot,entries,input,expectedRevision){
-    if(!snapshot.capabilities||snapshot.capabilities.operationSyncVersion!==1)throw new Error('Update Apps Script with Operations.gs and OperationSync.gs, then refresh online to enable these offline actions.');
+    if(!snapshot.capabilities||snapshot.capabilities.operationSyncVersion!==1)throw new Error((snapshot.syncDiagnostics&&snapshot.syncDiagnostics.operationIssue)||'The saved ledger does not report offline form support. Refresh online after updating Code.gs, Operations.gs and OperationSync.gs in the existing web app deployment.');
     if(input.version!==1||input.ledgerId!==snapshot.ledgerId||input.table!=='OPERATIONS'||input.operation!=='bundle'||typeof input.mutationId!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_-]{15,79}$/.test(input.mutationId)||typeof input.recordId!=='string'||!/^op_[A-Za-z0-9_-]{8,76}$/.test(input.recordId)||Object.keys(input).some(function(k){return ['version','ledgerId','mutationId','operation','table','recordId','values'].indexOf(k)<0;}))throw new Error('Invalid offline operation.');
     var v=input.values;if(!v||Object.keys(v).some(function(k){return ['action','args','expected'].indexOf(k)<0;})||typeof v.action!=='string'||!Array.isArray(v.args)||!/^[a-f0-9]{64}$/.test(v.expected))throw new Error('Invalid operation values.');
     if(entries.some(function(e){return e.status==='conflict';}))throw new Error('Resolve pending conflicts on Home before making another planning change.');

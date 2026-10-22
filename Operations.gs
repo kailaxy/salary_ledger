@@ -1,5 +1,5 @@
 /* Shared deterministic operation planner. Embedded verbatim in Index.html; no network or model. */
-(function(root){
+var LedgerOperations = (function(){
 'use strict';
 var schemas={SETTINGS:['key','value'],PAY_PERIODS:['period_id','label','start_date','pay_date','is_closed'],INCOME:['income_id','period_id','received_date','amount','kind','source','note'],CATEGORIES:['category_id','name','kind','group_name','sort_order','is_archived'],FUND_GOALS:['category_id','target_amount','target_date'],BUDGET_LINES:['line_id','period_id','category_id','planned_amount'],TRANSACTIONS:['txn_id','period_id','category_id','type','txn_date','amount','note'],LOANS:['loan_id','name','lender','principal','total_payable','start_date','installment_amount','frequency','installment_count','status'],LOAN_INSTALLMENTS:['installment_id','loan_id','seq_no','due_date','amount_due'],LOAN_PAYMENTS:['payment_id','loan_id','installment_id','txn_id','paid_date','amount','note']};
 var guards={saveCategory:['CATEGORIES','FUND_GOALS','TRANSACTIONS','BUDGET_LINES'],deleteCategory:['CATEGORIES','FUND_GOALS','TRANSACTIONS','BUDGET_LINES'],setBudget:['PAY_PERIODS','CATEGORIES','BUDGET_LINES'],saveLoan:['LOANS','LOAN_INSTALLMENTS','LOAN_PAYMENTS'],deleteLoan:['LOANS','LOAN_INSTALLMENTS','LOAN_PAYMENTS'],editRecord:['INCOME','TRANSACTIONS','LOAN_PAYMENTS','LOANS','LOAN_INSTALLMENTS','CATEGORIES','PAY_PERIODS'],deleteRecord:['INCOME','TRANSACTIONS','LOAN_PAYMENTS','LOANS','LOAN_INSTALLMENTS','CATEGORIES','PAY_PERIODS'],saveSettings:['SETTINGS'],generatePeriods:['SETTINGS','PAY_PERIODS']};
@@ -237,5 +237,5 @@ function view(snapshot) {
   };
 }
 
-root.LedgerOperations={schemas:schemas,hash:hash,domain:domain,context:context,plan:plan,apply:apply,view:view,receipt:receipt,pk:pk};
-})(typeof window!=='undefined'?window:globalThis);
+return {schemas:schemas,hash:hash,domain:domain,context:context,plan:plan,apply:apply,view:view,receipt:receipt,pk:pk};
+})();

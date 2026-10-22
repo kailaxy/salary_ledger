@@ -68,3 +68,15 @@ test('physical Sheet row reordering cannot change deterministic future-budget ID
  const s=e.snapshot(),p=e.propose('setBudget',[{periodId:'per_test',categoryId:'cat_food',amount:123.45,applyToFuture:true}],s),proposal=e.ctx.LedgerOperations.plan(s,p.values.action,p.values.args,p.mutationId,'client timestamp');
  e.sheets.PAY_PERIODS.rows.splice(1,e.sheets.PAY_PERIODS.rows.length-1,...e.sheets.PAY_PERIODS.rows.slice(1).reverse());const r=e.runOp(p);assert.equal(r.status,'committed');e.ctx.LedgerOperations.receipt({proposalRecord:proposal},r);assert.equal(new Set(e.rows('BUDGET_LINES').map(b=>b.line_id)).size,3);assert.ok(e.rows('BUDGET_LINES').every(b=>b.planned_amount===123.45));
 });
+test('Apps Script planner binds explicitly even when globalThis is a separate object',()=>{
+ const vm=require('node:vm'),ctx=vm.createContext({globalThis:{}});
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../Operations.gs'),'utf8'),ctx);
+ assert.equal(typeof ctx.LedgerOperations.plan,'function');
+});
+test('snapshot explains missing operation dependencies and unprepared journal',()=>{
+ const e=fixture();assert.equal(e.snapshot().capabilities.operationSyncVersion,1);
+ e.ctx.LedgerOperations=undefined;assert.match(e.snapshot().syncDiagnostics.operationIssue,/Operations.gs/);
+ const other=fixture();other.ctx.syncJournal_=()=>{throw Error('bad journal');};
+ assert.equal(other.snapshot().capabilities.operationSyncVersion,0);
+ assert.match(other.snapshot().syncDiagnostics.operationIssue,/Prepare reliable sync/);
+});
