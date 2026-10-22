@@ -7,7 +7,7 @@ const contractSha=crypto.createHash('sha256').update(querySource).digest('hex');
 const ledger=JSON.parse(fs.readFileSync(path.join(root,'test-prompts/synthetic-ledger.json'))),now=new Date('2026-10-22T03:00:00Z');
 const baselineSystem=`Translate the financial question to ONE JSON object. No prose or markdown. Never mutate records. Return {"status":"unsupported"} for unsupported operations, exclusions or qualifiers; return {"status":"clarify"} for ambiguity or missing names/amounts. Never drop constraints.
 Query contract: action:"query", kind:"expense" or "income", operation:sum,average,min,max,top,count,list,categories,compare,cashflow,share,budgets,funds,loans,trends,frequency,recurring,savings_rate,afford. range:all,today,yesterday,this_week,last_week,this_month,last_month,this_year,current_period,previous_period,next_period,last_periods,dates. Default sum expense all; budget/afford/share default current_period. Date year is 2026; ledger today 2026-10-22 Asia/Manila. Weeks start Monday. dates requires startDate/endDate YYYY-MM-DD. last_periods requires periodCount 1..24 including current. No other fields unless needed. categoryId: food=Food/pagkain/grub, rent=Rent, transport=Transport/pamasahe; fund=Emergency Fund. loanId:loan=Phone. kind income can incomeKind SALARY,BONUS,OTHER. top/list can limit 1..50. average can unit day,week,month,period,entry. compare only this_month or current_period. trends requires last_periods. budgets mode remaining,over,utilization,unallocated,compare uses pay-period ranges. funds mode balance,goal (all-time only),deposits,withdrawals,contributions; categoryId identifies fund. loans mode balance,progress,installments (all-time),paid,due (date/pay-period range),next,overdue (all-time). share may incomeBasis salary or all. afford requires categoryId and amountMinor integer cents; only checks category plan. No unknown names or missing constraints. No calculation needed.`;
-const system=`Read-only question -> JSON only. No calculations/mutations.
+const v2System=`Read-only question -> JSON only. No calculations/mutations.
 Use {"action":"query","operation":...,"kind":"expense" or "income","range":...} plus filters. Defaults: sum/expense/all. Sums need NO amount/category. Only afford needs amountMinor (cents) + categoryId. Unknown entity/ambiguity: {"status":"clarify"}. Unsupported operation/exclusion/qualifier: {"status":"unsupported"}. Keep constraints.
 Operations: sum,average,min,max,top,count,list,categories,compare,cashflow,share,budgets,funds,loans,trends,frequency,recurring,savings_rate,afford.
 Ranges: all,today,yesterday,this_week,last_week,this_month,last_month,this_year,current_period,previous_period,next_period,last_periods,dates. Today 2026-10-22 Asia/Manila. dates needs startDate/endDate YYYY-MM-DD; last_periods needs periodCount 1..24. Weeks start Monday.
@@ -18,7 +18,24 @@ How much did I spend this month? -> {"action":"query","operation":"sum","kind":"
 Total income? -> {"action":"query","operation":"sum","kind":"income","range":"all"}
 Delete my expenses -> {"status":"unsupported"}
 What about that one? -> {"status":"clarify"}`;
-const cases=JSON.parse(fs.readFileSync(path.join(root,'test-prompts/intents.json')));for(const c of cases){if(c.expected.action)ctx.LedgerQuery.query(ledger,c.expected,now);c.system=system;c.baselineSystem=baselineSystem;c.user=c.question;}
+// Hand-authored development examples; no held-out questions or expected labels are read here.
+const repairExamples=[
+ {question:'Expenses this cutoff?',query:{action:'query',operation:'sum',kind:'expense',range:'current_period'}},
+ {question:'Expenses last 3 cutoffs?',query:{action:'query',operation:'sum',kind:'expense',range:'last_periods',periodCount:3}},
+ {question:'Spending from 2026-09-02 to 2026-09-09?',query:{action:'query',operation:'sum',kind:'expense',range:'dates',startDate:'2026-09-02',endDate:'2026-09-09'}},
+ {question:'Gastos sa pamasahe last month?',query:{action:'query',operation:'sum',kind:'expense',range:'last_month',categoryId:'transport'}}
+];
+for(const example of repairExamples)ctx.LedgerQuery.query(ledger,example.query,now);
+const system=v2System+`
+Filter rules (apply to every question):
+- this payday / this cutoff / ngayong sahod -> current_period. last cutoff -> previous_period. A payday is NOT a calendar month.
+- last N pay periods / cutoffs -> last_periods AND periodCount:N. Copy N exactly. limit is ONLY for top/list, never for a sum.
+- from START to END -> dates AND startDate:START AND endDate:END. Copy both ISO dates exactly; never replace with this_month.
+- Food/pagkain/grub -> categoryId:food. Transport/pamasahe -> categoryId:transport. Rent -> categoryId:rent. If a category is named, ALWAYS include its ID; category filters combine with any range.
+Examples of applying filters:
+`+repairExamples.map(e=>e.question+' -> '+JSON.stringify(e.query)).join('\n')+`
+Before emitting JSON, check the question's category, date boundaries and period count are all preserved. Do not add limit to sums.`;
+const cases=JSON.parse(fs.readFileSync(path.join(root,'test-prompts/intents.json')));for(const c of cases){if(c.expected.action)ctx.LedgerQuery.query(ledger,c.expected,now);c.system=system;c.baselineSystem=baselineSystem;c.v2System=v2System;c.user=c.question;}
 const settings=[['supportive-bestie',20],['financial-gremlin',50],['financial-gremlin',100],['sarcastic-accountant',80]];
 const clone=x=>JSON.parse(JSON.stringify(x));
 const scenarios=[

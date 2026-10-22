@@ -60,7 +60,7 @@ try{engine=new NativeEngine();}catch(LinkageError|RuntimeException e){nativeErro
         text(box,"Benchmark configuration",21);
         mode=spinner(box,"Task","Structured queries","Personality","Free synthetic prompt");
         cases=spinner(box,"Evaluation case","Loading cases…");threads=spinner(box,"CPU threads","2","3","4");context=spinner(box,"Context tokens","1024","2048");tokens=spinner(box,"Maximum output tokens","128","96","64");temperature=spinner(box,"Temperature (structured requires 0)","0","0.6");repeats=spinner(box,"Suite repetitions","1","3","5");
-        instructions=spinner(box,"Instruction profile","Compact v2 + examples","Original v1 baseline");
+        instructions=spinner(box,"Instruction profile","Filter-focused v3","Compact v2 + examples","Original v1 baseline");
         grammar=new CheckBox(this);grammar.setText("Constrain structured JSON (still requires accuracy scoring)");grammar.setChecked(true);box.addView(grammar);
         cache=new CheckBox(this);cache.setText("Reuse exact prompt prefix (warm-cache experiment)");cache.setChecked(false);box.addView(cache);
         text(box,"Sampling seed",14);seed=new EditText(this);seed.setSingleLine(true);seed.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);seed.setText("42");seed.setContentDescription("Sampling seed");box.addView(seed);
@@ -95,8 +95,8 @@ try{engine=new NativeEngine();}catch(LinkageError|RuntimeException e){nativeErro
             if(suite){if(modeIndex==2)throw new IllegalArgumentException("Choose structured or personality evaluation for a labeled suite");for(JSONObject original:visibleCases){if(development&&(!"intent".equals(original.optString("kind"))||!"development".equals(original.optString("split"))||!Arrays.asList("intent-001","intent-003","intent-009","intent-012","intent-015","intent-017","intent-018","intent-020").contains(original.optString("id"))))continue;chosen.add(new JSONObject(original.toString()));}if(chosen.isEmpty())throw new IllegalArgumentException("Choose Structured queries for the development check");}else{
                 JSONObject c=new JSONObject(visibleCases.get(cases.getSelectedItemPosition()).toString());String edited=prompt.getText().toString();if(modeIndex==2||!edited.equals(c.optString("user"))){c.put("id","manual").put("kind","manual").put("user",edited);if(modeIndex==2)c.put("system","Respond to the synthetic prompt only; no tools, real records, arithmetic or financial actions.");}chosen.add(c);
             }
-            runGrammar=grammar.isChecked()&&modeIndex==0;runCache=cache.isChecked();runVariant=modeIndex==0?(instructions.getSelectedItemPosition()==0?"compact-v2":"baseline-v1"):"personality-v1";
-            for(JSONObject c:chosen)if(modeIndex==0&&instructions.getSelectedItemPosition()==1)c.put("system",c.getString("baselineSystem"));
+            runGrammar=grammar.isChecked()&&modeIndex==0;runCache=cache.isChecked();runVariant=modeIndex==0?(instructions.getSelectedItemPosition()==0?"filter-v3":instructions.getSelectedItemPosition()==1?"compact-v2":"baseline-v1"):"personality-v1";
+            for(JSONObject c:chosen)if(modeIndex==0&&instructions.getSelectedItemPosition()>0)c.put("system",c.getString(instructions.getSelectedItemPosition()==1?"v2System":"baselineSystem"));
             for(JSONObject c:chosen)RunConfig.prompt(c.getString("system"),c.getString("user"));
             job("Generating offline on CPU",()->{
                 if(!runCache)engine.clearCache();
