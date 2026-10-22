@@ -29,3 +29,6 @@ The next presentation increment adds three local presets, a step-5 chaos slider,
 ## Production integration remains deferred
 
 Use the isolated Qwen2.5/llama.cpp benchmark as a candidate, then compare physical-device accuracy, memory, ABI compatibility, stability, battery/thermal behavior and latency on the Infinix Hot 11S NFC and Xiaomi Note 14 Pro 5G before choosing production settings. Retain Android 8 support for core ledger functions, the deterministic query validator, canonical monetary facts, personality boundaries and explicit financial confirmations. No model routing, AI network service, automatic financial mutation or inference integration into the production app is enabled.
+
+
+Phase 4 now prioritizes a universal deterministic capability registry and conversational entry previews. The first slice supports in-chat ordinary expenses, income and fund movements; complex CRUD stays discoverable through existing secure review workflows. See assistant-capabilities.md for current boundaries. Production Qwen integration remains deferred: explicit on-demand invocation and serialized unload-after-use are documented in conversation-provider-contract.md. Ordinary saves use deterministic preset/chaos reactions only.

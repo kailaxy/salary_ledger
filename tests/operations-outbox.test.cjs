@@ -50,3 +50,16 @@ test('quota failure while writing outbox or audit rolls back the entire confirma
   assert.equal((await e.local.list(e.s.ledgerId)).length,0);assert.notEqual((await e.local.restore()).state.app.name,'Quota');
  }
 });
+test('assistant preview compare-and-save rejects a stale snapshot inside the atomic transaction',async()=>{
+ const e=await setup(),expected=JSON.stringify([e.s.ledgerId,e.s.capturedAt,e.s.tables,[]]);
+ const p={version:1,ledgerId:e.s.ledgerId,mutationId:'request_stale_assistant_'+serial,operation:'add',table:'TRANSACTIONS',recordId:'txn_stale_assistant_'+serial,values:{periodId:'per_test',categoryId:'cat_food',date:'2026-10-22',amountMinor:25000,note:'Preview'}};
+ const fresh=JSON.parse(JSON.stringify(e.s));fresh.capturedAt='2026-10-21T00:00:00.000Z';await e.local.save(fresh);
+ await assert.rejects(e.local.enqueue(p,e.pending.revision(e.s,[],p.table,p.recordId),expected),/ledger changed/);assert.equal((await e.local.list(e.s.ledgerId)).length,0);
+});
+test('concurrent assistant confirmations based on one view cannot both commit; identical request retry stays idempotent',async()=>{
+ const e=await setup(),expected=JSON.stringify([e.s.ledgerId,e.s.capturedAt,e.s.tables,[]]);
+ const p={version:1,ledgerId:e.s.ledgerId,mutationId:'request_cas_assistant_'+serial,operation:'add',table:'TRANSACTIONS',recordId:'txn_cas_assistant_'+serial,values:{periodId:'per_test',categoryId:'cat_food',date:'2026-10-22',amountMinor:25000,note:'Preview'}};
+ const second={...p,mutationId:p.mutationId+'_b',recordId:p.recordId+'_b'},revision=e.pending.revision(e.s,[],p.table,p.recordId);
+ const outcomes=await Promise.allSettled([e.local.enqueue(p,revision,expected),e.local.enqueue(second,revision,expected)]);assert.equal(outcomes.filter(x=>x.status==='fulfilled').length,1);assert.equal((await e.local.list(e.s.ledgerId)).length,1);
+ const accepted=outcomes[0].status==='fulfilled'?p:second;await e.local.enqueue(accepted,revision,expected);assert.equal((await e.local.list(e.s.ledgerId)).length,1);
+});

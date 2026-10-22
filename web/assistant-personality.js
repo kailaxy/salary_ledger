@@ -99,6 +99,17 @@ function decorate(canonical,result,cfg,variation){
  else{var leads=preset.leads[idx];intro=leads[n%leads.length]+(idx>=2||c!=='neutral'?' '+pool[Math.floor(n/leads.length)%pool.length]:'');}
  return {canonical:canonical,intro:intro,context:c,personalityId:p.personalityId,chaos:p.chaos};
 }
+function actionReaction(event,cfg,variation){
+ if(!event||['expense.create','income.create','fund.deposit','fund.withdraw'].indexOf(event.capability)<0)throw new Error('Unknown reaction context.');
+ cfg=cfg||getConfig();config({version:1,personalityId:cfg.personalityId,chaos:cfg.chaos});var n=Number.isSafeInteger(variation)&&variation>=0?variation:0;
+ if(event.sensitive)return ['One clear step at a time.','A little clarity for your next decision.'][n%2];
+ var calm=['A little clarity for your next plan.','One step toward a clearer picture.'];if(cfg.chaos<=20)return calm[n%2];
+ var reactions={
+ 'supportive-bestie':['A little room to plan your next move, bestie.','The planning notebook gets a tiny spotlight!'],
+ 'financial-gremlin':['The planning gremlin has sharpened its tiny pencil.','Cue the tiny spreadsheet orchestra—planning edition!'],
+ 'sarcastic-accountant':['An excellent occasion for carefully labeled columns.','The planning committee of one acknowledges the occasion.']};
+ return reactions[cfg.personalityId][cfg.chaos>=65?1:0];
+}
 function preview(cfg){var canonical={label:'Fictional example · not your ledger',value:'₱250.00',detail:['Example only: Food plan ₱1,000.00 − recorded spending ₱750.00 = ₱250.00 remaining.','Remaining budget is not available cash.'],items:[],comparison:null};return decorate(canonical,{operation:'budgets',mode:'remaining',budgets:[{hasPlan:true,plannedMinor:100000,actualMinor:75000,remainingMinor:25000}]},cfg,Math.floor(cfg.chaos/5));}
-root.AssistantPersonality={getPresets:function(){return Object.keys(presets).map(function(id){return {id:id,name:presets[id].name,description:presets[id].description};});},defaults:function(){return clone(defaults);},setLedger:function(id){active=identity(id);return getConfig();},load:load,save:save,reset:function(id){return save(defaults,id);},getConfig:getConfig,config:config,context:context,decorate:decorate,preview:preview,storageKey:key,persistence:function(id){var k=key(id===undefined?active:id);return k&&writeState[k]===false?'session':'local';}};
+root.AssistantPersonality={getPresets:function(){return Object.keys(presets).map(function(id){return {id:id,name:presets[id].name,description:presets[id].description};});},defaults:function(){return clone(defaults);},setLedger:function(id){active=identity(id);return getConfig();},load:load,save:save,reset:function(id){return save(defaults,id);},getConfig:getConfig,config:config,context:context,decorate:decorate,actionReaction:actionReaction,preview:preview,storageKey:key,persistence:function(id){var k=key(id===undefined?active:id);return k&&writeState[k]===false?'session':'local';}};
 })(typeof window!=='undefined'?window:globalThis);
