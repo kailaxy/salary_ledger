@@ -55,6 +55,11 @@ jobs:
         run: |
           node --test android-ai-benchmark/tools/score.test.cjs
           python3 -m unittest discover -s android-ai-benchmark/tools -p 'test_*.py'
+      - name: Native grammar and cache-boundary smoke tests (no model weights)
+        run: |
+          cmake -S android-ai-benchmark/tools/native-smoke -B "$RUNNER_TEMP/bench-native-tests"
+          cmake --build "$RUNNER_TEMP/bench-native-tests" -j 2
+          "$RUNNER_TEMP/bench-native-tests/native-smoke"
       - name: Existing deterministic regression tests
         run: |
           npm ci --prefix tests

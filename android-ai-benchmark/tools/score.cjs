@@ -16,8 +16,8 @@ function score(input,reference,reviews={}){
  const lookup=new Map(reference.cases.map(c=>[c.id,c])),records=input.rows||[],runs=records.filter(r=>r.type==='run'&&!r.warmup),byProfile={};
  const totals={schemaValid:0,scored:0,exact:0,heldoutTotal:0,heldoutExact:0,heldoutQueryExact:0,heldoutQueries:0,unsupportedDetected:0,unsupportedExpected:0,clarifyDetected:0,clarifyExpected:0,fieldMatches:0,fieldTotal:0};
  const detailed=[],personalities=[];
- for(const row of runs){const cfg=row.config||{},profile=stable({context:cfg.context,threads:cfg.threads,maxOutput:cfg.maxOutput,temperature:cfg.temperature,seed:cfg.seed,kind:row.kind,airplaneMode:row.memoryBefore?.airplaneModeEnabled??null});(byProfile[profile]??=[]).push(row);const c=lookup.get(row.caseId);if(!c)continue;
-  if(row.user!==c.user||row.system!==c.system){detailed.push({runId:row.runId,caseId:c.id,error:'Prompt differs from labeled evaluation case; not scored'});continue;}
+ for(const row of runs){const cfg=row.config||{},profile=stable({context:cfg.context,threads:cfg.threads,maxOutput:cfg.maxOutput,temperature:cfg.temperature,seed:cfg.seed,kind:row.kind,grammar:cfg.grammar??false,prefixCache:cfg.prefixCache??false,cacheState:row.metrics?.cacheEnabled?(row.metrics.cachedPrefixTokens>0?"warm-prefix":"cold-prefix"):"disabled",promptVariant:cfg.promptVariant??"baseline-v1",airplaneMode:row.memoryBefore?.airplaneModeEnabled??null});(byProfile[profile]??=[]).push(row);const c=lookup.get(row.caseId);if(!c)continue;
+  if(row.user!==c.user||(row.system!==c.system&&row.system!==c.baselineSystem)){detailed.push({runId:row.runId,caseId:c.id,error:'Prompt differs from labeled evaluation case; not scored'});continue;}
   const output=row.metrics?.output||'';
   if(row.status==='cancelled')continue;
   if(c.kind==='personality'){

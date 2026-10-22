@@ -21,7 +21,7 @@ public final class BenchmarkActivity extends Activity {
     private volatile NativeEngine engine;private SerialSession session;private MemoryProbe memory;private ResultsStore records;
     private JSONObject manifest,dataset;private int successfulRuns,failedRuns,cancelledRuns;private ModelVerifier.Pin pin;private File modelFile;
     private TextView status,modelInfo,deviceInfo,metrics,output;private EditText prompt,seed;
-    private Spinner mode,cases,threads,context,tokens,temperature,repeats;
+    private Spinner mode,cases,threads,context,tokens,temperature,repeats,instructions;private CheckBox grammar,cache;private boolean runGrammar,runCache;private String runVariant;
     private final List<Button> actions=new ArrayList<>();private final List<JSONObject> visibleCases=new ArrayList<>();
     private final AtomicBoolean cancelled=new AtomicBoolean();private final AtomicLong cancelRequestedNs=new AtomicLong();private boolean destroyed,ready;private String nativeError;
     @Override public void onCreate(Bundle saved){
@@ -41,7 +41,7 @@ try{engine=new NativeEngine();}catch(LinkageError|RuntimeException e){nativeErro
         if(!session.submit(()->{try{work.run();}catch(Exception e){throw new RuntimeException(e);}},error->ui(()->{enable(true);status.setText(error==null?"Ready. "+(engine!=null&&engine.loaded?"Model loaded.":"Model unloaded."):safeError(error));modelInfo.setText(modelDescription());})))enable(true);
     }
     private String safeError(Throwable t){while(t.getCause()!=null)t=t.getCause();String m=t.getMessage();if(m!=null&&m.matches("[A-Z_]+(?::.*)?"))return m;return t instanceof OutOfMemoryError?"MEMORY_ALLOCATION_FAILED":t.getClass().getSimpleName()+": operation failed; see benchmark diagnostics";}
-    private void enable(boolean enabled){for(Button b:actions)b.setEnabled(enabled);for(View v:new View[]{mode,cases,threads,context,tokens,temperature,repeats,prompt,seed})v.setEnabled(enabled);}
+    private void enable(boolean enabled){for(Button b:actions)b.setEnabled(enabled);for(View v:new View[]{mode,cases,threads,context,tokens,temperature,repeats,prompt,seed,instructions,grammar,cache})v.setEnabled(enabled);}
     private TextView text(LinearLayout box,String value,int size){TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(Color.rgb(28,59,46));t.setPadding(0,10,0,8);box.addView(t);return t;}
     private Button button(LinearLayout box,String label,Runnable action){Button b=new Button(this);b.setText(label);b.setMinHeight(dp(48));box.addView(b);b.setOnClickListener(v->action.run());actions.add(b);return b;}
     private Spinner spinner(LinearLayout box,String label,String... values){text(box,label,14);Spinner s=new Spinner(this);s.setContentDescription(label);s.setMinimumHeight(dp(48));s.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,values));box.addView(s);return s;}
@@ -60,12 +60,15 @@ try{engine=new NativeEngine();}catch(LinkageError|RuntimeException e){nativeErro
         text(box,"Benchmark configuration",21);
         mode=spinner(box,"Task","Structured queries","Personality","Free synthetic prompt");
         cases=spinner(box,"Evaluation case","Loading cases…");threads=spinner(box,"CPU threads","2","3","4");context=spinner(box,"Context tokens","1024","2048");tokens=spinner(box,"Maximum output tokens","128","96","64");temperature=spinner(box,"Temperature (structured requires 0)","0","0.6");repeats=spinner(box,"Suite repetitions","1","3","5");
+        instructions=spinner(box,"Instruction profile","Compact v2 + examples","Original v1 baseline");
+        grammar=new CheckBox(this);grammar.setText("Constrain structured JSON (still requires accuracy scoring)");grammar.setChecked(true);box.addView(grammar);
+        cache=new CheckBox(this);cache.setText("Reuse exact prompt prefix (warm-cache experiment)");cache.setChecked(false);box.addView(cache);
         text(box,"Sampling seed",14);seed=new EditText(this);seed.setSingleLine(true);seed.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);seed.setText("42");seed.setContentDescription("Sampling seed");box.addView(seed);
         text(box,"Synthetic prompt (edits are scored as manual, not labeled cases)",14);prompt=new EditText(this);prompt.setMinLines(3);prompt.setMaxLines(8);prompt.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);prompt.setContentDescription("Synthetic prompt");box.addView(prompt);
         text(box,"Do not enter real salary records or credentials. Exports contain these prompts and outputs.",13);
         mode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> a){}public void onItemSelected(AdapterView<?> a,View v,int p,long id){temperature.setSelection(p==1?1:0);tokens.setSelection(p==1?1:0);refreshCases();}});
         cases.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> a){}public void onItemSelected(AdapterView<?> a,View v,int p,long id){if(p<visibleCases.size())prompt.setText(visibleCases.get(p).optString("user"));}});
-        button(box,"Run selected prompt",()->run(false,false));button(box,"Run warm-up (excluded from scores)",()->run(false,true));button(box,"Run evaluation suite",()->run(true,false));
+        button(box,"Run selected prompt",()->run(false,false));button(box,"Run warm-up (excluded from scores)",()->run(false,true));button(box,"Run 8-case development check",()->run(true,false,true));button(box,"Run evaluation suite (selected task only)",()->run(true,false));
         Button cancel=new Button(this);cancel.setText("Cancel active operation");cancel.setMinHeight(dp(48));box.addView(cancel);cancel.setOnClickListener(v->{session.cancel();status.setText("Cancellation requested; waiting for the native worker to stop.");});
         text(box,"Generated output",21);output=text(box,"No output yet.",16);output.setTextIsSelectable(true);
         text(box,"Metrics and stability",21);text(box,"Export JSON and run tools/score.cjs for query-contract accuracy, latency statistics and personality review. Runtime success is not proof of financial correctness.",13);metrics=text(box,"No measured inference yet. A model is required; device results are unverified.",13);metrics.setTextIsSelectable(true);
@@ -84,24 +87,28 @@ try{engine=new NativeEngine();}catch(LinkageError|RuntimeException e){nativeErro
     });}
     private void refreshCases(){if(dataset==null)return;visibleCases.clear();JSONArray all=dataset.optJSONArray("cases");String kind=mode.getSelectedItemPosition()==1?"personality":"intent";for(int i=0;i<all.length();i++){JSONObject c=all.optJSONObject(i);if(kind.equals(c.optString("kind")))visibleCases.add(c);}List<String> names=new ArrayList<>();for(JSONObject c:visibleCases)names.add(c.optString("id")+" · "+c.optString("language"));cases.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,names));if(!visibleCases.isEmpty())prompt.setText(visibleCases.get(0).optString("user"));}
     private RunConfig configuration(){return new RunConfig(Integer.parseInt(context.getSelectedItem().toString()),Integer.parseInt(threads.getSelectedItem().toString()),Integer.parseInt(tokens.getSelectedItem().toString()),Double.parseDouble(temperature.getSelectedItem().toString()),Integer.parseInt(seed.getText().toString()));}
-    private void run(boolean suite,boolean warmup){
+    private void run(boolean suite,boolean warmup){run(suite,warmup,false);}
+    private void run(boolean suite,boolean warmup,boolean development){
         if(engine==null||!engine.loaded){status.setText("Import and load the pinned model first.");return;}
         try{RunConfig cfg=configuration();int modeIndex=mode.getSelectedItemPosition();if(modeIndex==0&&cfg.temperature!=0)throw new IllegalArgumentException("Structured evaluation requires temperature 0");
             List<JSONObject> chosen=new ArrayList<>();int repeat=Integer.parseInt(repeats.getSelectedItem().toString());
-            if(suite){if(modeIndex==2)throw new IllegalArgumentException("Choose structured or personality evaluation for a labeled suite");chosen.addAll(visibleCases);}else{
+            if(suite){if(modeIndex==2)throw new IllegalArgumentException("Choose structured or personality evaluation for a labeled suite");for(JSONObject original:visibleCases){if(development&&(!"intent".equals(original.optString("kind"))||!"development".equals(original.optString("split"))||!Arrays.asList("intent-001","intent-003","intent-009","intent-012","intent-015","intent-017","intent-018","intent-020").contains(original.optString("id"))))continue;chosen.add(new JSONObject(original.toString()));}if(chosen.isEmpty())throw new IllegalArgumentException("Choose Structured queries for the development check");}else{
                 JSONObject c=new JSONObject(visibleCases.get(cases.getSelectedItemPosition()).toString());String edited=prompt.getText().toString();if(modeIndex==2||!edited.equals(c.optString("user"))){c.put("id","manual").put("kind","manual").put("user",edited);if(modeIndex==2)c.put("system","Respond to the synthetic prompt only; no tools, real records, arithmetic or financial actions.");}chosen.add(c);
             }
+            runGrammar=grammar.isChecked()&&modeIndex==0;runCache=cache.isChecked();runVariant=modeIndex==0?(instructions.getSelectedItemPosition()==0?"compact-v2":"baseline-v1"):"personality-v1";
+            for(JSONObject c:chosen)if(modeIndex==0&&instructions.getSelectedItemPosition()==1)c.put("system",c.getString("baselineSystem"));
             for(JSONObject c:chosen)RunConfig.prompt(c.getString("system"),c.getString("user"));
             job("Generating offline on CPU",()->{
+                if(!runCache)engine.clearCache();
                 if(suite&&!chosen.isEmpty())one(chosen.get(0),cfg,true,0);
                 for(int r=0;r<(suite?repeat:1);r++)for(JSONObject c:chosen){if(cancelled.get()||!engine.loaded)return;one(c,cfg,warmup,r);}
             });
         }catch(Exception e){status.setText(e.getMessage());}
     }
     private void one(JSONObject c,RunConfig cfg,boolean warmup,int repetition)throws Exception{
-        String marker=records.begin("inference");JSONObject row=new JSONObject().put("type","run").put("runId",marker).put("caseId",c.getString("id")).put("kind",c.getString("kind")).put("warmup",warmup).put("repetition",repetition).put("timestamp",System.currentTimeMillis()).put("system",c.getString("system")).put("user",c.getString("user")).put("config",new JSONObject().put("context",cfg.context).put("threads",cfg.threads).put("maxOutput",cfg.maxOutput).put("temperature",cfg.temperature).put("seed",cfg.seed)).put("memoryBefore",memory.sample());
+        String marker=records.begin("inference");JSONObject row=new JSONObject().put("type","run").put("runId",marker).put("caseId",c.getString("id")).put("kind",c.getString("kind")).put("warmup",warmup).put("repetition",repetition).put("timestamp",System.currentTimeMillis()).put("system",c.getString("system")).put("user",c.getString("user")).put("config",new JSONObject().put("context",cfg.context).put("threads",cfg.threads).put("maxOutput",cfg.maxOutput).put("temperature",cfg.temperature).put("seed",cfg.seed).put("grammar",runGrammar).put("prefixCache",runCache).put("promptVariant",runVariant)).put("memoryBefore",memory.sample());
         long start=SystemClock.elapsedRealtimeNanos();try(MemoryProbe.Sampling sampling=memory.new Sampling()){
-            try{JSONObject result=new JSONObject(engine.generate(c.getString("system"),c.getString("user"),cfg));row.put("metrics",result).put("status","cancelled".equals(result.optString("stopReason"))?"cancelled":"ok");}
+            try{JSONObject result=new JSONObject(engine.generate(c.getString("system"),c.getString("user"),cfg,runGrammar,runCache));row.put("metrics",result).put("status","cancelled".equals(result.optString("stopReason"))?"cancelled":"ok");}
             catch(Throwable t){row.put("status",cancelled.get()?"cancelled":"failed").put("error",safeError(t));if(t instanceof OutOfMemoryError||safeError(t).contains("ALLOCATION_FAILED"))engine.unload();}
             row.put("cancelRequestToReturnMs","cancelled".equals(row.optString("status"))&&cancelRequestedNs.get()>0?(SystemClock.elapsedRealtimeNanos()-cancelRequestedNs.get())/1e6:JSONObject.NULL).put("totalResponseMs",(SystemClock.elapsedRealtimeNanos()-start)/1e6).put("sampledPeakPssKb",sampling.peak.get()>0?sampling.peak.get():JSONObject.NULL).put("memoryAfter",memory.sample());
         }finally{records.append(row);records.finish(marker);}
