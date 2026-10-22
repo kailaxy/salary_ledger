@@ -497,6 +497,20 @@
   .assistant-records .assistant-category-bar span{ margin:0; }
   .assistant-category-bar span{ height:100%; display:block; background:var(--ink); border-radius:3px; }
   @media (max-width:350px){ .ledger-assistant{ padding-left:13px; padding-right:13px; } .assistant-source{ margin-left:-13px; margin-right:-13px; padding-left:13px; padding-right:13px; } .assistant-mark{ display:none; } .assistant-comparison{ grid-template-columns:1fr; } }
+  .assistant-intro{ font-size:13px; line-height:1.6; color:var(--ink); margin:0 0 12px; }
+  .personality-settings{ margin-top:22px; padding-top:20px; border-top:1px solid var(--rule-strong); }
+  .personality-settings[hidden]{ display:none; }
+  .personality-settings h3{ font:600 21px/1.2 'Spectral',serif; margin:0 0 10px; }
+  .personality-settings .fld{ margin:16px 0 6px; }
+  .personality-settings .hint{ line-height:1.6; margin:7px 0; overflow-wrap:anywhere; }
+  .personality-level{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:16px; }
+  .personality-level output{ font-size:14px; font-variant-numeric:tabular-nums; font-weight:600; }
+  .personality-range{ display:block; box-sizing:border-box; min-height:44px; width:100%; padding:0; margin:0; accent-color:var(--ink); background:transparent; cursor:pointer; }
+  .personality-preview{ border:1px solid var(--rule); border-radius:12px; background:linear-gradient(140deg,var(--card),#e5ebdf); padding:14px; margin:15px 0; }
+  .personality-preview .assistant-intro{ margin:10px 0; }
+  .personality-preview-value{ font:600 26px/1.2 'Spectral',serif; margin:8px 0; }
+  .personality-footer{ display:flex; align-items:center; flex-wrap:wrap; gap:10px; }
+  .personality-footer .btn2{ min-height:44px; }
   .pending-panel summary{ min-height:32px; cursor:pointer; font-size:13px; font-weight:600; }
   .pending-panel[hidden]{ display:none; }
   .pending-item{ border-top:1px solid var(--rule); padding:12px 0; overflow-wrap:anywhere; }
@@ -594,6 +608,24 @@
         <p id="localStatus" role="status" style="font-size:13px;line-height:1.5"></p>
         <div id="nativeDeviceSettings" hidden><p class="sub">This APK keeps its own offline copy. Connect once to download your Sheet; reconnect here if access is revoked.</p><button class="btn2" type="button" data-act="connectdevice" id="connectDeviceBtn" style="margin:12px 0">Connect this device</button></div>
         <div id="settingsBody"></div>
+        <section class="personality-settings" id="personalitySettings" aria-labelledby="personalityHeading" hidden>
+          <h3 id="personalityHeading">Assistant Personality</h3>
+          <p class="hint">A little character around the same verified facts. Changes save automatically on this device, for this ledger.</p>
+          <label class="fld"><span class="label">Personality</span><select id="personalityPreset" aria-describedby="personalityDescription"></select></label>
+          <p class="hint" id="personalityDescription"></p>
+          <div class="personality-level"><label class="label" for="personalityChaos">Chaos</label><output id="personalityChaosValue" for="personalityChaos">30%</output></div>
+          <input class="personality-range" id="personalityChaos" type="range" min="0" max="100" step="5" value="30" aria-describedby="personalityBand personalityBoundaries">
+          <p class="hint" id="personalityBand"></p>
+          <p class="hint" id="personalityBoundaries">Tone only. Amounts, dates, explanations and warnings stay intact. Sensitive situations always get a gentle response.</p>
+          <div class="personality-preview" aria-labelledby="personalityPreviewLabel">
+            <p class="label" id="personalityPreviewLabel">Fictional example · not your ledger</p>
+            <p id="personalityPreviewIntro" class="assistant-intro" aria-live="polite" aria-atomic="true"></p>
+            <p id="personalityPreviewValue" class="personality-preview-value"></p>
+            <p id="personalityPreviewFacts" class="hint"></p>
+            <p id="personalityPreviewCaveat" class="hint"></p>
+          </div>
+          <div class="personality-footer"><button class="btn2" id="personalityReset" type="button">Restore defaults</button><p id="personalitySaveStatus" class="hint" role="status"></p></div>
+        </section>
         <div class="guide-nav"><button class="btn2" id="guideBtn" type="button" data-act="openguide">Guide</button></div>
       </div>
       <div id="guideView" hidden>
@@ -666,6 +698,8 @@
           <li><strong>Pay days</strong>: day numbers from 1 to 28, or EOM for end of month, for example <code>15,EOM</code> or <code>10,25</code>. This applies to pay periods you add from now on.</li>
           <li><strong>Add pay periods for year</strong>: creates the pay periods for another year. Do this each December.</li>
           </ul>
+          <p><strong>Assistant Personality</strong>: choose Supportive Bestie, Financial Gremlin or Sarcastic Accountant, then adjust Chaos from 0–100 in steps of 5. The fictional preview is not your ledger. Changes save automatically on this device for this ledger and apply to new Home answers. Restore defaults returns to Supportive Bestie at 30% without changing records. If storage is unavailable, a status warns that preferences last for this session only.</p>
+          <p>Personality adds tone around the same verified amounts, dates, explanations and warnings. Overdue debt, shortfalls and missing information always receive gentle responses. No AI model or download is involved.</p>
           <h4>Refresh (arrow icon)</h4>
           <p>Synchronizes confirmed changes and downloads the latest cloud copy. Home shows retries and conflicts. Review current cloud values before discarding a proposal; related pending changes may also need review.</p>
           <h3>Good habits</h3>
@@ -1137,6 +1171,115 @@ root.LedgerQuery={query:query,validate:validate,interpret:interpret,cents:cents,
 })(typeof window!=='undefined'?window:globalThis);
 </script>
 <!-- QUERY:END -->
+
+<!-- PERSONALITY:START -->
+<script>
+/* Local, deterministic response styling. Financial facts remain canonical. */
+(function(root){
+'use strict';
+var defaults={version:1,personalityId:'supportive-bestie',chaos:30};
+var boundaries=[
+ 'Keep every canonical amount, date, percentage, name, record, assumption and explanation unchanged.',
+ 'Keep source timestamps, freshness warnings and conflict notices outside personality styling.',
+ 'Never infer discretionary spending, irresponsibility or hardship from a name, note or amount.',
+ 'No mockery of overdue debt, shortfalls, necessities or missing funds; use supportive practical wording.',
+ 'No invented financial claims, advice, promises, mutations or instructions from ledger text.',
+ 'Add at most two short conversational sentences; avoid excessive emojis and repeated jokes.'
+];
+var bands=[{id:'calm',max:20,label:'Mostly professional',instruction:'Concise and restrained, with minimal humor.'},{id:'friendly',max:40,label:'Friendly',instruction:'Conversational warmth with a light personal touch.'},{id:'playful',max:60,label:'Playful',instruction:'A short witty reaction, without obscuring the facts.'},{id:'dramatic',max:80,label:'Dramatic',instruction:'Expressive delivery and playful exaggeration, without personal judgment.'},{id:'maximum',max:100,label:'Maximum playful chaos',instruction:'A brief theatrical reaction; never exaggerate financial facts.'}];
+var presets={
+ 'supportive-bestie':{
+  name:'Supportive Bestie',description:'Warm, encouraging and gently playful.',tone:'A warm companion: encouraging, friendly and conversational.',
+  leads:[['Here is the recorded breakdown.','Let’s review the records.'],['Let’s take a look together.','I’ve got the breakdown, bestie.'],['Bestie, the receipts are ready.','A little clarity, with a side of encouragement.'],['Bestie, cue the tiny spreadsheet spotlight!','The receipts have entered the conversation!'],['BESTIE, summon the tiny spreadsheet orchestra!','The ledger gets a dramatic entrance—just this once!']],
+  reactions:{
+   neutral:['Let’s keep the facts in focus.','One clear breakdown at a time.'],
+   spending_increase:['Let’s look at the change without judging it.','Context first; a change is not a verdict.'],
+   goal_reached:['That recorded milestone deserves a little celebration.','A goal milestone worth acknowledging.'],
+   loan_completed:['That repayment milestone deserves recognition.','A recorded repayment finish worth celebrating.'],
+   budget_maintained:['The recorded spending and plan are getting along.','A little appreciation for staying within the recorded plan.'],
+   empty:['Nothing matched; another period may help.','No matches here; we can try a different scope.']
+  }
+ },
+ 'financial-gremlin':{
+  name:'Financial Gremlin',description:'Theatrical spreadsheet mischief, with the facts intact.',tone:'A sarcastic, dramatic spreadsheet gremlin; playful rather than cruel.',
+  leads:[['The recorded figures have the floor.','The gremlin will leave the facts to speak.'],['The ledger has receipts, naturally.','The spreadsheet gremlin is on desk duty.'],['Summoning the receipts; tiny cape optional.','The spreadsheet gremlin has opened the evidence folder.'],['THE RECEIPTS REQUEST THE FLOOR!','Cue the dramatic calculator entrance!'],['RELEASE THE SPREADSHEET GOBLINS!','THE CALCULATOR HAS ARRIVED IN A TINY CAPE!']],
+  reactions:{
+   neutral:['The numbers get final say; gremlin rules.','The theatrics stop where the facts begin.'],
+   spending_increase:['A plot twist in the totals; context still matters.','The comparison has a plot twist, not a moral verdict.'],
+   goal_reached:['A goal milestone—tiny victory parade authorized.','The recorded goal gets a ceremonial tiny trumpet.'],
+   loan_completed:['Repayment milestone unlocked; the tiny cape bows.','A repayment finish—even the gremlin applauds.'],
+   budget_maintained:['The recorded plan survives this episode.','The plan and receipts have signed a temporary truce.'],
+   empty:['No matches in this evidence folder; try another scope.','No receipts found here; try another period.']
+  }
+ },
+ 'sarcastic-accountant':{
+  name:'Sarcastic Accountant',description:'Dry humor and deadpan observations.',tone:'Professional-sounding, dry and understated; sarcasm targets spreadsheets, not financial hardship.',
+  leads:[['The recorded figures are presented below.','The supporting records follow.'],['Let’s examine the evidence.','The figures are ready for inspection.'],['The spreadsheet has prepared a statement.','An exciting day for carefully labeled columns.'],['The audit committee of one has convened.','The figures have requested a formal entrance.'],['AN EXTRAORDINARY MEETING OF THE RECEIPTS IS NOW IN SESSION.','The spreadsheet has retained dramatic legal counsel.']],
+  reactions:{
+   neutral:['The facts remain refreshingly literal.','The supporting figures are below; thrilling, I know.'],
+   spending_increase:['The change deserves context, not a lecture.','A comparison is evidence, not a character assessment.'],
+   goal_reached:['A recorded milestone—a restrained celebration is in order.','A goal milestone, duly noted with unusual enthusiasm.'],
+   loan_completed:['A repayment milestone—the paperwork applauds quietly.','A recorded repayment finish, worthy of a very small standing ovation.'],
+   budget_maintained:['The recorded plan and spending appear to be on speaking terms.','The recorded spending remains within plan; order has its moments.'],
+   empty:['No matching evidence; another scope may be more productive.','No matches in the selected records—a rare short report.']
+  }
+ }
+};
+// These take precedence over persona and chaos. No category-name or note heuristics.
+var gentle={
+ budget_exceeded:['Let’s review the remaining plan gently; the figures are not a judgment.','We can look at the recorded overage one step at a time.'],
+ sensitive:['Let’s review what is recorded, one step at a time.','I’ll keep this clear and practical; there’s no judgment here.'],
+ insufficient:['There isn’t enough recorded information for that conclusion.','Let’s keep the limits of the available records clear.'],
+ unsupported:['Let’s try a clearer question; your records haven’t changed.','I can help with a supported question, without guessing.']
+};
+var calmNotes={goal_reached:'A recorded goal milestone worth acknowledging.',loan_completed:'A recorded repayment milestone worth acknowledging.',budget_maintained:'Recorded spending is within the selected plan.',empty:'No matching records; try another scope.'};
+var active=null,fallback=Object.create(null),writeState=Object.create(null),prefix='sl2_assistant_personality_v1:';
+function clone(x){return JSON.parse(JSON.stringify(x));}
+function identity(id){if(typeof id!=='string'||!id||id.length>200)return null;return id;}
+function key(id){id=identity(id);return id?prefix+encodeURIComponent(id):null;}
+function valid(p){return !!p&&typeof p==='object'&&!Array.isArray(p)&&p.version===1&&typeof p.personalityId==='string'&&Object.prototype.hasOwnProperty.call(presets,p.personalityId)&&Number.isInteger(p.chaos)&&p.chaos>=0&&p.chaos<=100&&p.chaos%5===0&&Object.keys(p).every(function(k){return ['version','personalityId','chaos'].indexOf(k)>=0;});}
+function load(id){var k=key(id===undefined?active:id);if(!k)return clone(defaults);if(fallback[k])return clone(fallback[k]);try{var p=JSON.parse(root.localStorage.getItem(k));return clone(valid(p)?p:defaults);}catch(e){return clone(defaults);}}
+function save(p,id){var ledger=identity(id===undefined?active:id),k=key(ledger);if(!k)throw new Error('Download a ledger before personalizing its assistant.');var full={version:1,personalityId:p&&p.personalityId,chaos:p&&p.chaos};if(!p||Object.keys(p).some(function(k){return ['version','personalityId','chaos'].indexOf(k)<0;})||(p.version!==undefined&&p.version!==1)||!valid(full))throw new Error('Choose a known personality and a chaos level from 0 to 100 in steps of 5.');
+ var durable=true;try{root.localStorage.setItem(k,JSON.stringify(full));delete fallback[k];}catch(e){fallback[k]=clone(full);durable=false;}writeState[k]=durable;return {preferences:clone(full),persisted:durable};
+}
+function band(chaos){return bands.find(function(b){return chaos<=b.max;});}
+function config(p){if(!valid(p))throw new Error('Invalid personality preferences.');var preset=presets[p.personalityId],b=band(p.chaos);return {version:1,personalityId:p.personalityId,name:preset.name,chaos:p.chaos,expressionBand:b.id,expressionLabel:b.label,toneInstructions:[preset.tone,b.instruction],humorBoundaries:clone(boundaries),preferredResponseLength:{maxSentences:2,maxCharacters:240},languagePreference:null,mode:'deterministic'};}
+function getConfig(id){return config(load(id));}
+function context(r){
+ if(!r||r.error)return 'unsupported';
+ if(r.operation==='afford')return r.fitsPlan===false?'sensitive':r.fitsPlan===null?'insufficient':'neutral';
+ if(r.operation==='budgets'){
+  if(r.mode==='unallocated')return !r.hasIncome?'insufficient':r.unallocatedMinor<0?'sensitive':'neutral';
+  if(r.budgets.some(function(b){return b.remainingMinor<0;}))return 'budget_exceeded';
+  if(!r.budgets.length||r.budgets.some(function(b){return !b.hasPlan;}))return 'insufficient';
+  return r.budgets.some(function(b){return b.plannedMinor>0;})?'budget_maintained':'neutral';
+ }
+ if(r.operation==='funds'){
+  if(!r.funds.length)return 'empty';if(r.funds.some(function(f){return f.balanceMinor<0;}))return 'sensitive';
+  if(r.mode==='goal'&&r.funds.some(function(f){return !f.targetMinor;}))return 'insufficient';
+  if(r.mode==='goal'&&r.funds.every(function(f){return f.targetMinor>0&&f.balanceMinor>=f.targetMinor;}))return 'goal_reached';return 'neutral';
+ }
+ if(r.operation==='loans'){
+  if(!r.loans.length)return 'empty';if(r.loans.some(function(l){return l.installments.some(function(i){return i.status==='OVERDUE'&&i.minor>0;});}))return 'sensitive';
+  if(r.loans.every(function(l){return l.totalMinor>0&&l.remainingMinor===0;}))return 'loan_completed';
+  return ['due','next','overdue'].indexOf(r.mode)>=0&&!r.installments.length?'empty':'neutral';
+ }
+ if(['cashflow','savings_rate','share'].indexOf(r.operation)>=0){if(r.incomeMinor===0)return 'insufficient';if(r.netMinor<0)return 'sensitive';}
+ if(r.count===0)return 'empty';if(r.operation==='compare'&&r.differenceMinor>0&&r.kind==='expense')return 'spending_increase';return 'neutral';
+}
+function decorate(canonical,result,cfg,variation){
+ cfg=cfg||getConfig();var p={version:1,personalityId:cfg.personalityId,chaos:cfg.chaos};if(!valid(p))throw new Error('Invalid personality configuration.');
+ var n=Number.isSafeInteger(variation)&&variation>=0?variation:0,c=context(result),preset=presets[p.personalityId],idx=bands.indexOf(band(p.chaos)),pool=gentle[c]||preset.reactions[c]||preset.reactions.neutral,intro;
+ if(gentle[c])intro=pool[n%pool.length];
+ else if(idx===0)intro=preset.leads[0][n%2]+(calmNotes[c]?' '+calmNotes[c]:'');
+ else{var leads=preset.leads[idx];intro=leads[n%leads.length]+(idx>=2||c!=='neutral'?' '+pool[Math.floor(n/leads.length)%pool.length]:'');}
+ return {canonical:canonical,intro:intro,context:c,personalityId:p.personalityId,chaos:p.chaos};
+}
+function preview(cfg){var canonical={label:'Fictional example · not your ledger',value:'₱250.00',detail:['Example only: Food plan ₱1,000.00 − recorded spending ₱750.00 = ₱250.00 remaining.','Remaining budget is not available cash.'],items:[],comparison:null};return decorate(canonical,{operation:'budgets',mode:'remaining',budgets:[{hasPlan:true,plannedMinor:100000,actualMinor:75000,remainingMinor:25000}]},cfg,Math.floor(cfg.chaos/5));}
+root.AssistantPersonality={getPresets:function(){return Object.keys(presets).map(function(id){return {id:id,name:presets[id].name,description:presets[id].description};});},defaults:function(){return clone(defaults);},setLedger:function(id){active=identity(id);return getConfig();},load:load,save:save,reset:function(id){return save(defaults,id);},getConfig:getConfig,config:config,context:context,decorate:decorate,preview:preview,storageKey:key,persistence:function(id){var k=key(id===undefined?active:id);return k&&writeState[k]===false?'session':'local';}};
+})(typeof window!=='undefined'?window:globalThis);
+</script>
+<!-- PERSONALITY:END -->
 
 <!-- OPERATIONS:START -->
 <script>
@@ -1755,10 +1898,28 @@ return {schemas:schemas,hash:hash,domain:domain,context:context,plan:plan,apply:
       '<label class="fld" style="margin:0"><span class="label">Add pay periods for year</span><input id="sYear" type="text" inputmode="numeric" maxlength="4" value="' + next + '"></label>' +
       '<button class="btn2" type="submit">Add periods</button></div></form>';
   }
-  var settingsOpen = false;
+  var settingsOpen = false, personalityLedgerId = null, personalityTurn = 0;
+  function fillPersonality(){
+    var section=$('#personalitySettings');section.hidden=!ledgerSnapshot;
+    if(!ledgerSnapshot)return;
+    var select=$('#personalityPreset'),presets=AssistantPersonality.getPresets();
+    if(!select.options.length)presets.forEach(function(p){var option=document.createElement('option');option.value=p.id;option.textContent=p.name;select.appendChild(option);});
+    var cfg=AssistantPersonality.getConfig(ledgerSnapshot.ledgerId),preview=AssistantPersonality.preview(cfg);
+    select.value=cfg.personalityId;$('#personalityDescription').textContent=presets.find(function(p){return p.id===cfg.personalityId;}).description;
+    $('#personalityChaos').value=cfg.chaos;$('#personalityChaos').setAttribute('aria-valuetext',cfg.chaos+'% · '+cfg.expressionLabel);
+    $('#personalityChaosValue').textContent=cfg.chaos+'%';$('#personalityBand').textContent=cfg.expressionLabel;
+    $('#personalityPreviewIntro').textContent=preview.intro;$('#personalityPreviewValue').textContent=preview.canonical.value;
+    $('#personalityPreviewFacts').textContent=preview.canonical.detail[0];$('#personalityPreviewCaveat').textContent=preview.canonical.detail[1];
+    var status=AssistantPersonality.persistence(ledgerSnapshot.ledgerId)==='session'?'Device storage is unavailable. Preferences apply for this session only.':'Applies to new answers. Saved only on this device.';
+    if($('#personalitySaveStatus').textContent!==status)$('#personalitySaveStatus').textContent=status;
+  }
+  function savePersonality(reset){
+    if(!ledgerSnapshot)return;
+    try{if(reset)AssistantPersonality.reset(ledgerSnapshot.ledgerId);else AssistantPersonality.save({personalityId:$('#personalityPreset').value,chaos:Number($('#personalityChaos').value)},ledgerSnapshot.ledgerId);fillPersonality();if(reset)$('#personalitySaveStatus').textContent='Defaults restored. '+$('#personalitySaveStatus').textContent;}catch(error){$('#personalitySaveStatus').textContent=error.message;}
+  }
   function fillSettings(){
     if (!settingsOpen) return;
-    setLocalStatus(localStatus);
+    setLocalStatus(localStatus);fillPersonality();
     $('#nativeDeviceSettings').hidden=!nativeMode;
     if(data&&data.setupDone&&$('#setForm'))return;
     $('#settingsBody').innerHTML = data && data.setupDone ? settingsHTML(data) : nativeMode&&!data ? '<p class="sub">Connect this device to download your ledger. Your Google Sheet remains the cloud copy.</p>' : setupCard();
@@ -1789,9 +1950,12 @@ return {schemas:schemas,hash:hash,domain:domain,context:context,plan:plan,apply:
     turn.appendChild(question); turn.appendChild(answer); history.appendChild(turn);
     while(history.children.length > 10) history.removeChild(history.firstChild);
     function paragraph(content, cls){ var el = document.createElement('p'); el.className = cls || 'assistant-detail'; el.textContent = content; answer.appendChild(el); }
+    var variation=personalityTurn++;
     try {
       var queryTime=new Date(), q = LedgerQuery.interpret(text, ledgerSnapshot, queryTime), r = LedgerQuery.query(ledgerSnapshot, q, queryTime);
       var response = LedgerQuery.format(r, ledgerSnapshot.currency);
+      var styled=AssistantPersonality.decorate(response,r,AssistantPersonality.getConfig(ledgerSnapshot.ledgerId),variation);
+      paragraph(styled.intro,'assistant-intro');
       paragraph(response.label, 'assistant-result-label');
       if(response.value !== null) paragraph(response.value, 'assistant-value');
       if(response.comparison){
@@ -1805,7 +1969,7 @@ return {schemas:schemas,hash:hash,domain:domain,context:context,plan:plan,apply:
         if(response.items.length>50)paragraph('Showing 50 of '+response.items.length+' results. Ask about a named category, fund or loan to narrow the answer.');
       }
       paragraph((snapshotStale ? 'Refresh to include your latest changes. ' : '') + (pendingEntries.length ? 'Includes non-conflicting pending changes. ' : '') + 'From the ledger saved ' + new Intl.DateTimeFormat('en',{timeZone:ledgerSnapshot.timezone,month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(ledgerSnapshot.capturedAt)) + '.', 'assistant-answer-source');
-    } catch(e){ answer.classList.add('is-error'); paragraph('Let’s try a different question', 'assistant-empty'); paragraph(e.message); }
+    } catch(e){ answer.classList.add('is-error'); paragraph(AssistantPersonality.decorate(null,{error:true},AssistantPersonality.getConfig(),variation).intro,'assistant-intro'); paragraph('Let’s try a different question', 'assistant-empty'); paragraph(e.message); }
     history.scrollTop = history.scrollHeight;
   }
   function openSettings(){
@@ -1952,6 +2116,10 @@ return {schemas:schemas,hash:hash,domain:domain,context:context,plan:plan,apply:
   function refreshLocal(){
     return LedgerLocal.view().then(function(view){
       if(!view.snapshot)return;
+      if(personalityLedgerId!==view.snapshot.ledgerId){
+        if(personalityLedgerId){$('#chatHistory').textContent='';$('#chatHeading').hidden=true;$('#assistantInput').value='';}
+        personalityLedgerId=view.snapshot.ledgerId;personalityTurn=0;AssistantPersonality.setLedger(personalityLedgerId);
+      }
       cloudSnapshot=view.snapshot;pendingEntries=view.entries;cloudSnapshot.state.today=LedgerQuery.bounds('today',cloudSnapshot.timezone)[0];ledgerSnapshot=LedgerPending.project(cloudSnapshot,pendingEntries);
       if(cloudSnapshot.capabilities&&cloudSnapshot.capabilities.operationSyncVersion===1)ledgerSnapshot.state=LedgerOperations.view(ledgerSnapshot);
       data=ledgerSnapshot.state;
@@ -2398,7 +2566,7 @@ return {schemas:schemas,hash:hash,domain:domain,context:context,plan:plan,apply:
     else if (act === 'payloan') { addType = 'Loan'; showTab('add'); fillAdd(); $('#fLoan').value = id; $('#fAmount').value = ''; fillAdd(); prefillLoan(); }
   });
   document.addEventListener('change', function(e){
-    var t = e.target; if (!t || !data) return;
+    var t = e.target;if(t&&t.id==='personalityPreset'){savePersonality(false);return;} if (!t || !data) return;
     if (t.classList && t.classList.contains('plan-in')) savePlanLine(t);
     else if (t.id === 'planPer') { planPer = t.value; fillPlan(); reveal($('#panel-plan')); }
     else if (t.id === 'fAlso') fillAdd();
@@ -2407,6 +2575,7 @@ return {schemas:schemas,hash:hash,domain:domain,context:context,plan:plan,apply:
   });
   document.addEventListener('toggle',function(e){if(e.target.id==='entryHistory')renderHistory();},true);
   document.addEventListener('input', function(e){
+    if(e.target.id==='personalityChaos'){savePersonality(false);return;}
     if(e.target.id==='historySearch'){historyLimit=40;renderHistory();return;}
     var f = e.target && e.target.closest ? e.target.closest('form') : null; if (!f) return;
     if (f.id === 'addForm') delete cids.add; else if (f.id === 'catForm') delete cids.cat; else if (f.id === 'loanForm') { delete cids.loan; loanPreview(); }
@@ -2427,6 +2596,8 @@ return {schemas:schemas,hash:hash,domain:domain,context:context,plan:plan,apply:
   window.addEventListener('online', function(){updateAssistantSource();load();});
   window.addEventListener('offline', updateAssistantSource);
   window.addEventListener('ledgerresume',function(){updateAssistantSource();load();});
+  $('#personalityReset').addEventListener('click',function(){savePersonality(true);});
+  window.addEventListener('storage',function(e){if(ledgerSnapshot&&(e.key===null||e.key===AssistantPersonality.storageKey(ledgerSnapshot.ledgerId))&&settingsOpen)fillPersonality();});
   $('#reviewCancel').addEventListener('click',function(){closeReview(false);});
   $('#reviewConfirm').addEventListener('click',function(){closeReview(true);});
   $('#entryReview').addEventListener('click',function(e){if(e.target===this)closeReview(false);});

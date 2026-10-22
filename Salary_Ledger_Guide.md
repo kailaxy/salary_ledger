@@ -71,6 +71,11 @@ Every fund with its balance, progress toward its target, how far you have to go,
 - **Pay days**: day numbers from 1 to 28, or EOM for end of month, for example `15,EOM` or `10,25`. This applies to pay periods you add from now on.
 - **Add pay periods for year**: creates the pay periods for another year. Do this each December.
 
+
+Under **Assistant Personality**, choose **Supportive Bestie**, **Financial Gremlin**, or **Sarcastic Accountant**. Adjust **Chaos** from 0–100 in steps of 5 to change the tone of new Home answers. The fictional preview updates immediately; its example amounts are not from your ledger. Changes save automatically on this device for this ledger, separately from financial settings. **Restore defaults** returns to Supportive Bestie at 30% without affecting records. If storage is unavailable, the section warns that preferences apply for this session only.
+
+Chaos never changes amounts, explanations or warnings. Overdue debt, budget shortfalls and missing information always receive gentle responses. This is a deterministic personality system, with no AI model or download. See [personality settings and limitations](docs/assistant-personality.md).
+
 ### Refresh (arrow icon)
 Synchronizes confirmed changes, then downloads the latest cloud copy. Home shows pending changes, retries and conflicts. Keep a failed proposal until you review the current cloud values; discarding it keeps a local audit copy. Related pending changes wait for earlier changes and may also need review if an earlier proposal is discarded.
 

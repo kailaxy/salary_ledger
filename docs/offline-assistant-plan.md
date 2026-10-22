@@ -18,6 +18,10 @@ Automated Node, browser and Android checks are documented per increment. Require
 
 The next increment expands the existing read-only LedgerQuery engine with calendar and recorded-pay-period scopes, income kinds, averages, category rankings/frequencies, comparisons/trends, budgets and overages, fund goals/transfers, installment obligations, savings ratios, recurring candidates and bounded plan affordability checks. English/Taglish parsing separates normalization, time extraction, exact entity resolution, anchored intent templates and strict structured validation. Financial results use checked integer cents; presentation is a separate formatter. Conflicted projections remain excluded. See [assistant-questions.md](assistant-questions.md) for supported templates, formulas, deployment and known limits. No model or native integration is included.
 
+## Deterministic personalities
+
+The next presentation increment adds three local presets, a step-5 chaos slider, fictional live preview and per-ledger preference persistence. AssistantPersonality decorates the canonical formatter output with controlled context-aware reactions; no financial calculation or source metadata is rewritten. Sensitive cases override humor. Its reusable config exposes tone, expression and boundaries for a future model adapter. See [assistant-personality.md](assistant-personality.md). No inference or model download is included.
+
 ## Deferred by the owner
 
 Discuss on-device LLM options only after the owner is satisfied with the offline ledger. Evaluate official runtime availability, license, formats, verified downloads, model size, SDK/ABI support, RAM and real-device latency on the Infinix Hot 11S NFC (target 4 GB RAM) and Xiaomi Note 14 Pro 5G, while retaining Android 8 support for core ledger functions. The existing deterministic query/proposal validation and explicit confirmations must remain authoritative. No runtime/model selection, cloud AI, model download or inference integration is included in the current work.

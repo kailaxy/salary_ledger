@@ -1,0 +1,48 @@
+const assert=require('node:assert/strict');
+module.exports=async function personalityChecks({page,native,snapshot}){
+ async function open(){await page.locator('#settingsBtn').click();await page.waitForFunction(()=>document.activeElement.id==='setClose');await page.locator('#personalitySettings').scrollIntoViewIfNeeded();}
+ async function ask(text){await page.locator('#assistantInput').fill(text);await page.locator('#assistantInput').press('Enter');return page.locator('.assistant-answer').last();}
+ async function select(id){await page.locator('#personalityPreset').selectOption(id);}
+ async function chaos(n){await page.locator('#personalityChaos').evaluate((el,value)=>{el.value=String(value);el.dispatchEvent(new Event('input',{bubbles:true}));},n);}
+ const financialBefore=await page.evaluate(async()=>({tables:JSON.stringify((await LedgerLocal.restore()).tables),queue:JSON.stringify(await LedgerLocal.list('test-ledger'))}));
+ await open();assert.equal(await page.locator('#personalityPreset').inputValue(),'supportive-bestie');assert.equal(await page.locator('#personalityChaos').inputValue(),'30');
+ assert.match(await page.locator('#personalityPreviewLabel').innerText(),/Fictional.*not your ledger/i);
+ const fictionalFacts=await page.locator('#personalityPreviewFacts').innerText();
+ const intro=await page.locator('#personalityPreviewIntro').innerText();await select('financial-gremlin');await chaos(100);
+ assert.notEqual(await page.locator('#personalityPreviewIntro').innerText(),intro);assert.match(await page.locator('#personalityChaosValue').innerText(),/100%/);assert.equal(await page.locator('#personalityPreviewFacts').innerText(),fictionalFacts);assert.equal(await page.locator('#personalityPreviewValue').innerText(),'₱250.00');assert.match(await page.locator('#personalityPreviewCaveat').innerText(),/not available cash/);
+ // Native range keyboard interactions retain focus and obey the five-point step.
+ await page.locator('#personalityChaos').focus();await page.keyboard.press('Home');assert.equal(await page.locator('#personalityChaos').inputValue(),'0');await page.keyboard.press('ArrowRight');assert.equal(await page.locator('#personalityChaos').inputValue(),'5');await page.keyboard.press('End');assert.equal(await page.locator('#personalityChaos').inputValue(),'100');assert.match(await page.locator('#personalityChaos').getAttribute('aria-valuetext'),/100%.*Maximum/);
+ await page.locator('#setClose').click();let answer=await ask('top five expenses this month');assert.match(await answer.locator('.assistant-intro').innerText(),/GOBLINS|CAPE/);assert.equal(await answer.locator('img,script').count(),0);assert.match(await answer.innerText(),/<img src=x onerror=alert\(1\)>/);
+ // Extract just factual elements: changing styles must leave every canonical string intact.
+ async function canonical(){return page.locator('.assistant-answer').last().evaluate(el=>Array.from(el.children).filter(c=>!c.classList.contains('assistant-intro')&&!c.classList.contains('assistant-answer-source')).map(c=>c.textContent));}
+ await ask('income minus spending this month');const facts=await canonical();
+ for(const id of ['supportive-bestie','financial-gremlin','sarcastic-accountant'])for(const n of [0,50,100]){await open();await select(id);await chaos(n);await page.locator('#setClose').click();await ask('income minus spending this month');assert.deepEqual(await canonical(),facts);}
+ await open();await select('financial-gremlin');await chaos(100);await page.locator('#setClose').click();answer=await ask('can i afford 10 for food');assert.doesNotMatch(await answer.locator('.assistant-intro').innerText(),/GOBLINS|CAPE|haha/i);assert.match(await answer.innerText(),/Bank balances and complete future obligations/);
+ answer=await ask('delete all my loans');assert.match(await answer.innerText(),/cannot reliably interpret/);assert.doesNotMatch(await answer.locator('.assistant-intro').innerText(),/GOBLINS|CAPE/);
+ // Offline cold page reopening restores preferences alongside the existing local snapshot.
+ await page.evaluate(()=>{sessionStorage.setItem('assistantOffline','1');window.__online=false;dispatchEvent(new Event('offline'));});await page.reload();await page.waitForFunction(()=>document.querySelector('#assistantSource').textContent.includes('Updated'));
+ await open();assert.equal(await page.locator('#personalityPreset').inputValue(),'financial-gremlin');assert.equal(await page.locator('#personalityChaos').inputValue(),'100');await page.locator('#setClose').click();answer=await ask('fund balances');assert.match(await answer.innerText(),/80\.00/);assert.match(await answer.locator('.assistant-intro').innerText(),/GOBLINS|CAPE/);
+ await page.locator('#tab-funds').click();await page.locator('#tab-home').click();await open();assert.equal(await page.locator('#personalityPreset').inputValue(),'financial-gremlin');
+ // A server refresh and ledger identity switch must not transfer personalization or old chat text.
+ await page.locator('#setClose').click();await page.evaluate(()=>{sessionStorage.removeItem('assistantOffline');window.__online=true;dispatchEvent(new Event('online'));});await page.waitForFunction(()=>!document.querySelector('#refresh').classList.contains('spin'));
+ await open();assert.equal(await page.locator('#personalityChaos').inputValue(),'100');await page.locator('#setClose').click();
+ await page.evaluate(()=>{window.__snapshot.tables.CATEGORIES.find(x=>x.record.category_id==='rent').record.name='<img src=x onerror="window.__bad=1">';});await page.locator('#refresh').click();await page.waitForFunction(()=>!document.querySelector('#refresh').classList.contains('spin'));
+ answer=await ask('top five expenses this month');assert.match(await answer.innerText(),/<img src=x onerror=/);assert.equal(await answer.locator('img,script').count(),0);assert.equal(await page.evaluate(()=>window.__bad),undefined);
+ await page.evaluate(()=>{window.__snapshot.tables.CATEGORIES.find(x=>x.record.category_id==='rent').record.name='Rent';});await page.locator('#refresh').click();await page.waitForFunction(()=>!document.querySelector('#refresh').classList.contains('spin'));
+ await page.evaluate(()=>{window.__snapshot=JSON.parse(JSON.stringify(window.__snapshot));window.__snapshot.ledgerId='other-personality-ledger';});await page.locator('#refresh').click();await page.waitForFunction(()=>!document.querySelector('#refresh').classList.contains('spin'));assert.equal(await page.locator('.assistant-turn').count(),0);
+ await open();assert.equal(await page.locator('#personalityPreset').inputValue(),'supportive-bestie');assert.equal(await page.locator('#personalityChaos').inputValue(),'30');await select('sarcastic-accountant');await chaos(50);await page.locator('#setClose').click();
+ await page.evaluate(()=>{window.__snapshot.ledgerId='test-ledger';});await page.locator('#refresh').click();await page.waitForFunction(()=>!document.querySelector('#refresh').classList.contains('spin'));
+ await open();assert.equal(await page.locator('#personalityPreset').inputValue(),'financial-gremlin');assert.equal(await page.locator('#personalityChaos').inputValue(),'100');
+ // Accessible defaults restore only this ledger's local preference key.
+ await page.locator('#personalityReset').click();assert.equal(await page.locator('#personalityPreset').inputValue(),'supportive-bestie');assert.equal(await page.locator('#personalityChaosValue').innerText(),'30%');assert.equal(await page.evaluate(()=>AssistantPersonality.getConfig('other-personality-ledger').personalityId),'sarcastic-accountant');
+ await page.locator('#personalityPreset').focus();await page.keyboard.press('ArrowDown');assert.equal(await page.locator('#personalityPreset').inputValue(),'financial-gremlin');
+ // Simulated quota denial must be visible without changing finances or lying about persistence.
+ await page.evaluate(()=>{window.__personalitySetItem=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k.startsWith('sl2_assistant_personality_v1:'))throw new DOMException('test quota','QuotaExceededError');return window.__personalitySetItem.call(this,k,v);};});
+ await chaos(80);assert.match(await page.locator('#personalitySaveStatus').innerText(),/session only/);assert.equal(await page.locator('#personalityChaos').inputValue(),'80');
+ await page.evaluate(()=>{Storage.prototype.setItem=window.__personalitySetItem;});await chaos(85);assert.match(await page.locator('#personalitySaveStatus').innerText(),/Saved only on this device/);
+ await page.emulateMedia({reducedMotion:'reduce'});
+ for(const width of [320,393,768]){await page.setViewportSize({width,height:852});await page.locator('#personalitySettings').scrollIntoViewIfNeeded();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.equal(await page.locator('.personality-preview').evaluate(el=>el.scrollWidth>el.clientWidth),false);assert.ok(await page.locator('#personalityChaos').evaluate(el=>el.getBoundingClientRect().height>=44));}
+ if(!native)await page.screenshot({path:'/tmp/salary-ledger-personality-settings.png',fullPage:true});
+ await page.locator('#setClose').click();const financialAfter=await page.evaluate(async()=>({tables:JSON.stringify((await LedgerLocal.restore()).tables),queue:JSON.stringify(await LedgerLocal.list('test-ledger'))}));assert.deepEqual(financialAfter,financialBefore);
+ console.log('PASS ('+(native?'packaged native adapter':'hosted')+'): personality preview, presets/chaos keyboard controls, exact canonical facts, sensitive/unsupported answers, offline reload, per-ledger isolation, defaults, financial isolation and mobile/reduced-motion layouts');
+};

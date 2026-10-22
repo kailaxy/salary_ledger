@@ -51,6 +51,10 @@ Supported templates are not unrestricted language understanding. Extra clauses, 
 
 The financial result is a structured fact object. A separate formatter creates labels, values, explanatory text, comparisons and list items; the UI inserts text through `textContent`. Notes and names never become HTML, code or instructions. Results show the saved-ledger timestamp and pending/conflict context. Conversation remains in memory, capped at ten turns. At most 50 items render per answer, with truncation stated.
 
+## Personality settings
+
+Settings → Assistant Personality changes the tone of new answers. Supportive Bestie, Financial Gremlin and Sarcastic Accountant share the exact same canonical facts. Chaos changes expressiveness from 0 to 100, not the numbers or completeness of explanations. Sensitive cases remain supportive. The preview is explicitly fictional; preferences save locally per ledger. See [assistant-personality.md](assistant-personality.md) for defaults, storage limits and the future adapter configuration.
+
 ## Development and later model integration
 
 `web/ledger-query.js` is the standalone source; run `python3 tools/embed-query.py` after edits to embed the identical engine into Index.html. Hosted Apps Script and the Android APK use that same inline source without a production dependency or separate fetch. Existing LedgerQuery methods remain available; `format(result, currency)` is the new presentation seam.

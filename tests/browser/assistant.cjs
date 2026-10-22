@@ -8,9 +8,9 @@ const {fixture,now}=require('../helpers/query-engine.cjs');
   const context=await browser.newContext({viewport:{width:393,height:852}}),page=await context.newPage(),errors=[],requests=[];page.on('pageerror',e=>errors.push(e.message));
   await page.addInitScript(({snapshot,native,time})=>{
    const RealDate=Date;class Clock extends RealDate{constructor(...a){super(...(a.length?a:[time]));}static now(){return new RealDate(time).getTime();}}window.Date=Clock;
-   window.__online=true;Object.defineProperty(navigator,'onLine',{get:()=>window.__online});window.__calls=[];
-   if(native){window.LedgerAndroid={onmessage:null,postMessage(raw){const r=JSON.parse(raw);window.__calls.push(r.method);setTimeout(()=>LedgerAndroid.onmessage({data:JSON.stringify({id:r.id,ok:r.method==='getLedgerSnapshot',result:snapshot,error:'READ_ONLY_TEST'})}),5);}};Object.defineProperty(window,'google',{get(){throw Error('Hosted adapter accessed in native mode');}});}
-   else{localStorage.setItem('sl2_pin','123456');window.google={script:{}};Object.defineProperty(google.script,'run',{get(){let ok,bad;return {withSuccessHandler(fn){ok=fn;return this;},withFailureHandler(fn){bad=fn;return this;},getLedgerSnapshot(){window.__calls.push('getLedgerSnapshot');setTimeout(()=>ok(snapshot),5);}};}});}
+   window.__snapshot=snapshot;window.__online=sessionStorage.getItem('assistantOffline')!=='1';Object.defineProperty(navigator,'onLine',{get:()=>window.__online});window.__calls=[];
+   if(native){window.LedgerAndroid={onmessage:null,postMessage(raw){const r=JSON.parse(raw);window.__calls.push(r.method);setTimeout(()=>LedgerAndroid.onmessage({data:JSON.stringify({id:r.id,ok:r.method==='getLedgerSnapshot',result:window.__snapshot,error:'READ_ONLY_TEST'})}),5);}};Object.defineProperty(window,'google',{get(){throw Error('Hosted adapter accessed in native mode');}});}
+   else{localStorage.setItem('sl2_pin','123456');window.google={script:{}};Object.defineProperty(google.script,'run',{get(){let ok,bad;return {withSuccessHandler(fn){ok=fn;return this;},withFailureHandler(fn){bad=fn;return this;},getLedgerSnapshot(){window.__calls.push('getLedgerSnapshot');setTimeout(()=>ok(window.__snapshot),5);}};}});}
   },{snapshot,native,time:now.toISOString()});
   const origin=native?'https://appassets.androidplatform.net':'https://ledger.test',url=origin+(native?'/assets/Index.html':'/');
   const html=fs.readFileSync(path.join(__dirname,'../../Index.html'),'utf8').replace(/^<link[^>]*https:\/\/fonts\.(googleapis|gstatic)\.com[^>]*>\r?\n/gm,'').replace(/^<base[^>]*>\r?\n/gm,'');
@@ -36,6 +36,7 @@ const {fixture,now}=require('../helpers/query-engine.cjs');
   for(const width of [320,393,768]){await page.setViewportSize({width,height:852});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'page overflow at '+width);assert.equal(await page.locator('.assistant-answer').last().evaluate(e=>e.scrollWidth>e.clientWidth),false,'answer overflow at '+width);}
   await page.evaluate(()=>{window.__online=true;dispatchEvent(new Event('online'));});await page.waitForFunction(()=>!document.querySelector('#refresh').classList.contains('spin'));
   assert.equal(await page.locator('#assistantInput').inputValue(),'keep my draft');assert.ok((await page.evaluate(()=>window.__calls)).every(m=>m==='getLedgerSnapshot'));
+  await require('./personality-checks.cjs')({page,native,snapshot});
   assert.deepEqual(errors,[]);assert.deepEqual(requests,[]);
   if(!native)await page.screenshot({path:'/tmp/salary-ledger-assistant.png',fullPage:true});
   console.log('PASS ('+(native?'packaged native adapter':'hosted')+'): expanded assistant, financial breakdowns, Taglish, offline queries, safe notes, strict qualifiers, preserved draft, Settings focus, mobile layouts and read-only transport');await context.close();
