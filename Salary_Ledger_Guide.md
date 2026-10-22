@@ -1,6 +1,6 @@
 # Salary Ledger — Quick Guide
 
-Salary Ledger tracks each paycheck from the moment it arrives: what you planned to do with it, what you actually spent, what went into savings funds, and what you still owe on loans. Everything is stored in your own Google Sheet.
+Salary Ledger tracks each paycheck from the moment it arrives: what you planned to do with it, what you actually spent, what went into savings funds, and what you still owe on loans. Your Google Sheet is the cloud copy. After the first download, the Android app can open, answer supported ledger questions, and save confirmed changes offline.
 
 ## The four ideas
 
@@ -11,9 +11,9 @@ Salary Ledger tracks each paycheck from the moment it arrives: what you planned 
 
 ## First-time setup (about 5 minutes)
 
-1. Create a blank Google Sheet, then Extensions → Apps Script. Paste in `Code.gs` and add `Index.html`.
+1. Create a blank Google Sheet, then Extensions → Apps Script. Add the latest `Code.gs`, `Sync.gs`, `LoanSync.gs`, `Operations.gs`, `OperationSync.gs`, `Transport.gs` and `Index.html`.
 2. Reload the sheet. Open the **Salary Ledger** menu → **Set up (run once)**.
-3. **Salary Ledger → Set or change PIN** (6 to 12 digits). Saving is switched off until a PIN exists.
+3. **Salary Ledger → Set or change PIN** (6 to 12 digits). Saving is switched off until a PIN exists. Run **Prepare reliable sync** from the same menu.
 4. Deploy → New deployment → Web app. Execute as: Me. Who has access: Anyone. Open the link on your phone.
 
 ## The screens
@@ -23,8 +23,8 @@ Your summary at a glance: total saved (salary received minus spending), where yo
 
 ### Plan
 Decide what each paycheck is for.
-- Pick a pay period at the top, then type a planned amount beside each category or fund. It saves when you leave the box.
-- Tick **copy to every later pay period** to set a recurring amount once instead of every paycheck.
+- Pick a pay period at the top, then type a planned amount beside each category or fund. Leaving the box opens a review. Confirm **Save on device** to queue the change.
+- Tick **copy to every later pay period** to copy the amount to later open periods already on your ledger. Newly generated periods are not filled retrospectively.
 - The bar under each row shows how much of the plan you have used. It turns red when you go over.
 - **New category** and **New fund** create them. Tap **Edit** on any row to rename it, change its group or target, archive it (hides it but keeps its history), or delete it (only possible if it has no records).
 
@@ -35,7 +35,7 @@ One form for everything you record. Pick the type at the top:
 - **Income**: salary, bonus or other, with an optional source such as your employer. You can enter more than one per pay period.
 - **Loan pay**: choose the loan; the amount is filled in with the next installment. Leave **Also count it as spending** ticked if the payment should reduce your budget in a category (for example, Loan Payment).
 
-Recent entries appear below the form. To remove one, tap **Delete** and then **Sure?**. For income and ordinary expenses, tap **Edit**, change the fields, and review before saving. Fund deposits and withdrawals can also be saved offline after the updated server is deployed and cached. Review the direction, fund and amount before saving. Withdrawals cannot exceed the cached balance; a changed cloud balance may require conflict review. Loan payments can also be saved offline after the updated server is deployed and cached. Review the loan, amount still owed, and whether to count the payment as spending. Each loan can have one pending payment; synchronize or resolve it before recording another. Loan balances and optional spending update together. Creating or editing a loan, editing funds, and deletion require internet.
+Recent entries appear below the form. Tap **Edit** for income, expenses, fund movements or loan payments; review before saving. **Find an older entry** searches the full saved history by category, note, date or ID. A loan payment and its counted spending are edited together. For deletion, tap **Delete**, **Sure?**, then review all affected records. Deletions retain history in the Sheet. Fund changes cannot overdraw a fund. Each loan can have one pending new payment; synchronize or resolve it before recording another.
 
 ### Funds
 Every fund with its balance, progress toward its target, how far you have to go, and whether you are on track against your plan so far. **New fund** starts a fund from here.
@@ -44,7 +44,7 @@ Every fund with its balance, progress toward its target, how far you have to go,
 - **New loan**: enter what you borrowed, the total to repay (including interest and fees), the number of installments, the first due date, and how often you pay (twice a month, monthly, every 2 weeks or weekly).
 - Each loan card shows progress, what is left, and the next installment due. **Installments** lists the full schedule with paid, partial and overdue marks. **Payments** lists what you have paid.
 - **Record payment** jumps to the Add screen for that loan. Payments cover installments oldest first.
-- You can delete a loan only after its payments are deleted.
+- **Edit loan** changes its name and lender while preserving the existing schedule. You can delete a loan only after its payments are deleted.
 
 ### Settings (gear icon, top right)
 - **App name**: rename the app.
@@ -52,7 +52,13 @@ Every fund with its balance, progress toward its target, how far you have to go,
 - **Add pay periods for year**: creates the pay periods for another year. Do this each December.
 
 ### Refresh (arrow icon)
-Reloads the latest data from your sheet. Useful if you also edit the sheet directly.
+Synchronizes confirmed changes, then downloads the latest cloud copy. Home shows pending changes, retries and conflicts. Keep a failed proposal until you review the current cloud values; discarding it keeps a local audit copy. Related pending changes wait for earlier changes and may also need review if an earlier proposal is discarded.
+
+## Saving offline
+
+After the first complete online download, all existing ledger forms work offline: budgets, categories and fund goals, loan creation/renaming, income and expense entries, fund/loan-payment edits, deletion, settings and pay-period generation. Every write has a confirmation step. Plans, new categories and new loans can be used by later queued entries before reconnecting. Changes survive closing and reopening the app, then synchronize on refresh, reconnect or authorized app resume. Background sync while the app is closed is not provided.
+
+Set up and pair the Android device online first. Initial setup, changing the cloud PIN and pairing/revoking devices remain owner/online operations. The release and Dev apps have separate local caches but use the same Sheet by default. Never clear app data or uninstall with pending changes. If storage is full, the app reports that nothing was saved; free space and retry. Large multi-record changes are limited to 150 rows or the journal's safe size; split very large plans into smaller saves.
 
 ## Good habits
 
@@ -62,11 +68,11 @@ Reloads the latest data from your sheet. Useful if you also edit the sheet direc
 
 ## Behind the scenes
 
-The setup creates ten tabs: SETTINGS, PAY_PERIODS, INCOME, CATEGORIES, FUND_GOALS, BUDGET_LINES, TRANSACTIONS, LOANS, LOAN_INSTALLMENTS and LOAN_PAYMENTS. Deleting a record in the app only stamps its `deleted_at` column, so you can restore it by clearing that cell. Please avoid editing IDs or moving columns by hand.
+The setup creates ten tabs: SETTINGS, PAY_PERIODS, INCOME, CATEGORIES, FUND_GOALS, BUDGET_LINES, TRANSACTIONS, LOANS, LOAN_INSTALLMENTS and LOAN_PAYMENTS. Deleting a record in the app stamps its `deleted_at` column. Linked payments/spending and loan schedules must be restored consistently; do not clear one tombstone alone. Preserve SYNC_JOURNAL and use its before/after records when investigating recovery. Avoid editing IDs, moving columns, or changing partially synchronized rows directly in Sheets.
 
 ## If something looks wrong
 
 - **"Set up (run once)" message in the app**: run the setup from the sheet's Salary Ledger menu, then refresh.
 - **"Saving is off until you set a PIN"**: use Salary Ledger → Set or change PIN in the sheet.
 - **"Too many wrong tries"**: wait 10 minutes and try again.
-- **A save seemed to fail**: income and ordinary expenses stay in the pending list and retry safely. For fund or loan saves, refresh and check the sheet before retrying an uncertain save.
+- **A save seemed to fail**: confirmed changes stay in the pending list and retry with the same request identity. Do not create the same entry again. Review Home for conflicts. If an interrupted bundle was edited directly in Sheets, recovery pauses; preserve the journal and pending data and restore its recorded before/after values before retrying.

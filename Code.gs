@@ -107,6 +107,7 @@ function withLock_(fn) {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(15000)) throw new Error('BUSY');
   try {
+    if (typeof recoverPendingOperations_ === 'function') recoverPendingOperations_(SpreadsheetApp.getActiveSpreadsheet());
     if (typeof recoverPendingLoanPayments_ === 'function') recoverPendingLoanPayments_(SpreadsheetApp.getActiveSpreadsheet());
     return fn();
   } finally { lock.releaseLock(); }
@@ -359,7 +360,7 @@ function getLedgerSnapshot(pin) {
     let syncVersion = 0;
     if (typeof syncJournal_ === 'function') { try { syncJournal_(ss); syncVersion = 1; } catch (e) { /* Explicit preparation is required. */ } }
     return {
-      capabilities: {recordSyncVersion: syncVersion, fundSyncVersion: syncVersion && typeof fundSyncVersion_ === 'function' ? fundSyncVersion_() : 0, loanSyncVersion: syncVersion && typeof loanSyncVersion_ === 'function' ? loanSyncVersion_() : 0},
+      capabilities: {recordSyncVersion: syncVersion, fundSyncVersion: syncVersion && typeof fundSyncVersion_ === 'function' ? fundSyncVersion_() : 0, loanSyncVersion: syncVersion && typeof loanSyncVersion_ === 'function' ? loanSyncVersion_() : 0, operationSyncVersion: syncVersion && typeof operationSyncVersion_ === 'function' ? operationSyncVersion_() : 0},
       formatVersion: 1, ledgerId: ss.getId(), capturedAt: now.toISOString(),
       timezone: TZ_, currency: settings.currency || '₱', minorUnitScale: 2,
       tables: tables, state: buildState_(ss, now)

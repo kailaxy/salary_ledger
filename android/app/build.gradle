@@ -31,7 +31,7 @@ android {
         minSdk 26
         targetSdk 35
         versionCode buildNumber.toInteger()
-        versionName '0.3.0'
+        versionName '0.4.0'
         resValue 'string', 'app_name', 'Salary Ledger'
         buildConfigField 'String', 'LEDGER_WEB_APP_URL', '"' + ledgerUrl + '"'
     }

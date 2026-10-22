@@ -25,7 +25,7 @@ function environment(){
  put('PAY_PERIODS',{period_id:'per_test',label:'Oct',pay_date:'2026-10-15'});
  put('CATEGORIES',{category_id:'cat_food',name:'Food',kind:'SPENDING'});
  for(const table of ['TRANSACTIONS','INCOME','LOAN_PAYMENTS'])sheets[table]=new Sheet(table,[Array.from(ctx.colsOf_(table))]);
- return {ctx,sheets,put,prepare:()=>ctx.prepareReliableSync_(),run:r=>ctx.syncLedgerMutation('123456',r),crashAt:n=>{flushCount=0;failAt=n;},reset:()=>{flushCount=0;failAt=0;}};
+ return {ctx,sheets,put,flushCount:()=>flushCount,prepare:()=>ctx.prepareReliableSync_(),run:r=>ctx.syncLedgerMutation('123456',r),crashAt:n=>{flushCount=0;failAt=n;},reset:()=>{flushCount=0;failAt=0;}};
 }
 function loanFixture(){
  const e=environment();e.prepare();
