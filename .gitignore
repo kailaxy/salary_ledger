@@ -7,3 +7,13 @@ local.properties
 *.keystore.b64
 
 node_modules/
+
+# Isolated AI benchmark: never commit model weights, native build caches or private runs.
+*.gguf
+*.gguf.part
+android-ai-benchmark/.cxx/
+android-ai-benchmark/**/.cxx/
+android-ai-benchmark/third_party/
+android-ai-benchmark/benchmark-results/*.json
+android-ai-benchmark/benchmark-results/*.csv
+__pycache__/

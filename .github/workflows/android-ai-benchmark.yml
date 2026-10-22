@@ -1,0 +1,103 @@
+name: Build isolated Android AI benchmark
+on:
+  workflow_dispatch:
+    inputs:
+      model_revision:
+        description: 'Optional full official HF revision, or main to resolve once into this APK manifest'
+        required: false
+        default: ''
+  push:
+    paths: ['android-ai-benchmark/**', '.github/workflows/android-ai-benchmark.yml']
+  pull_request:
+    paths: ['android-ai-benchmark/**', '.github/workflows/android-ai-benchmark.yml']
+permissions:
+  contents: read
+jobs:
+  benchmark:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      BENCH_PREVIEW: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: '8.9'
+      - name: Install native toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-35' 'build-tools;34.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
+          echo "BENCH_VERSION_CODE=$((GITHUB_RUN_NUMBER + 1))" >> "$GITHUB_ENV"
+      - name: Fetch exact runtime commit
+        run: android-ai-benchmark/tools/fetch-runtime.sh
+      - name: Pin official model metadata (no weights downloaded)
+        shell: bash
+        env:
+          MODEL_REVISION: ${{ inputs.model_revision }}
+        run: |
+          set -euo pipefail
+          manifest="$RUNNER_TEMP/benchmark-model-manifest.json"
+          if [[ -n "$MODEL_REVISION" ]]; then
+            python3 android-ai-benchmark/tools/pin-model.py --revision "$MODEL_REVISION" --output "$manifest"
+          else
+            python3 android-ai-benchmark/tools/pin-model.py --output "$manifest"
+          fi
+          echo "BENCH_MODEL_MANIFEST=$manifest" >> "$GITHUB_ENV"
+      - name: Evaluation and pinning tests
+        run: |
+          node --test android-ai-benchmark/tools/score.test.cjs
+          python3 -m unittest discover -s android-ai-benchmark/tools -p 'test_*.py'
+      - name: Existing deterministic regression tests
+        run: |
+          npm ci --prefix tests
+          npm --prefix tests test
+      - name: Build persistent-signed benchmark on main
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          LEDGER_DEBUG_KEYSTORE_BASE64: ${{ secrets.LEDGER_DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          export LEDGER_DEBUG_KEYSTORE_PATH="$RUNNER_TEMP/bench-debug.jks"
+          trap 'rm -f "$LEDGER_DEBUG_KEYSTORE_PATH"' EXIT
+          if [[ -z "$LEDGER_DEBUG_KEYSTORE_BASE64" ]]; then
+            echo 'The benchmark uses the existing LEDGER_DEBUG_KEYSTORE_BASE64 secret for persistent debug signing.' >&2
+            exit 1
+          fi
+          printf '%s' "$LEDGER_DEBUG_KEYSTORE_BASE64" | base64 --decode > "$LEDGER_DEBUG_KEYSTORE_PATH"
+          gradle --no-daemon --console=plain -p android-ai-benchmark assembleDebug lintDebug testDebugUnitTest
+      - name: Build preview without secrets
+        if: github.event_name == 'pull_request' || github.ref != 'refs/heads/main'
+        run: gradle --no-daemon --console=plain -p android-ai-benchmark assembleDebug lintDebug testDebugUnitTest
+      - name: Verify arm64 and 16 KB native layout
+        run: |
+          python3 android-ai-benchmark/tools/verify-apk.py android-ai-benchmark/app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify android-ai-benchmark/app/build/outputs/apk/debug/app-debug.apk
+      - name: Upload benchmark APK and its exact artifact/evaluation manifests
+        uses: actions/upload-artifact@v6
+        with:
+          name: ledger-ai-benchmark
+          path: |
+            android-ai-benchmark/app/build/outputs/apk/debug/app-debug.apk
+            android-ai-benchmark/app/build/generated/benchmarkAssets/model-manifest.json
+            android-ai-benchmark/app/build/generated/benchmarkAssets/evaluation-reference.json
+            android-ai-benchmark/app/build/generated/benchmarkAssets/llama-LICENSE.txt
+          if-no-files-found: error
+      - name: Upload diagnostic reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: ledger-ai-benchmark-reports
+          path: |
+            android-ai-benchmark/app/build/reports/
+            android-ai-benchmark/app/build/test-results/
+          if-no-files-found: ignore

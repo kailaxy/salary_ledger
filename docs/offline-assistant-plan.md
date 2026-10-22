@@ -1,6 +1,6 @@
 # Offline ledger and assistant status
 
-All existing ledger forms now have confirmed local saving and durable synchronization; LLM integration is deliberately excluded until a separate model/runtime discussion. Setup/pairing/PIN administration remain owner/online operations. The Android wrapper supports Android 8+, bundled startup, native device pairing, app-private ledger storage and Keystore-protected credentials. Release and persistent-signed Dev variants have separate application IDs.
+All existing ledger forms now have confirmed local saving and durable synchronization; Production LLM integration remains deferred until the isolated prototype has physical-device evidence. Setup/pairing/PIN administration remain owner/online operations. The Android wrapper supports Android 8+, bundled startup, native device pairing, app-private ledger storage and Keystore-protected credentials. Release and persistent-signed Dev variants have separate application IDs.
 
 ## Delivered increments
 
@@ -22,6 +22,10 @@ The next increment expands the existing read-only LedgerQuery engine with calend
 
 The next presentation increment adds three local presets, a step-5 chaos slider, fictional live preview and per-ledger preference persistence. AssistantPersonality decorates the canonical formatter output with controlled context-aware reactions; no financial calculation or source metadata is rewritten. Sensitive cases override humor. Its reusable config exposes tone, expression and boundaries for a future model adapter. See [assistant-personality.md](assistant-personality.md). No inference or model download is included.
 
-## Deferred by the owner
+## Phase 3: isolated native feasibility prototype
 
-Discuss on-device LLM options only after the owner is satisfied with the offline ledger. Evaluate official runtime availability, license, formats, verified downloads, model size, SDK/ABI support, RAM and real-device latency on the Infinix Hot 11S NFC (target 4 GB RAM) and Xiaomi Note 14 Pro 5G, while retaining Android 8 support for core ledger functions. The existing deterministic query/proposal validation and explicit confirmations must remain authoritative. No runtime/model selection, cloud AI, model download or inference integration is included in the current work.
+[android-ai-benchmark](../android-ai-benchmark/README.md) is a separate arm64/API 26+ app with a pinned llama.cpp CPU provider, private verified-model import, cancellation/unload, measured timing/memory fields, 80 labeled intent cases and 16 synthetic personality cases, JSON/CSV export and offline scoring against LedgerQuery. It does not access the production ledger or change Home routing, native authentication, financial synchronization or signing. The local APK builds, but official Hugging Face metadata is blocked in this cloud environment; imports remain disabled until an exact official model pin is bundled (the separate CI workflow resolves one). No weights or device inference have been run here. Xiaomi/Infinix performance, model accuracy, fact preservation and memory/thermal suitability remain unverified; see the benchmark's device procedure and results table.
+
+## Production integration remains deferred
+
+Use the isolated Qwen2.5/llama.cpp benchmark as a candidate, then compare physical-device accuracy, memory, ABI compatibility, stability, battery/thermal behavior and latency on the Infinix Hot 11S NFC and Xiaomi Note 14 Pro 5G before choosing production settings. Retain Android 8 support for core ledger functions, the deterministic query validator, canonical monetary facts, personality boundaries and explicit financial confirmations. No model routing, AI network service, automatic financial mutation or inference integration into the production app is enabled.

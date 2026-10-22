@@ -1,0 +1,362 @@
+{
+  "formatVersion": 1,
+  "ledgerId": "benchmark-synthetic",
+  "capturedAt": "2026-10-22T03:00:00.000Z",
+  "timezone": "Asia/Manila",
+  "currency": "₱",
+  "minorUnitScale": 2,
+  "tables": {
+    "SETTINGS": [],
+    "PAY_PERIODS": [
+      {
+        "record": {
+          "period_id": "p1",
+          "pay_date": "2026-09-15",
+          "start_date": "2026-09-15",
+          "label": "2026-09-15"
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "period_id": "p2",
+          "pay_date": "2026-09-30",
+          "start_date": "2026-09-30",
+          "label": "2026-09-30"
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "period_id": "p3",
+          "pay_date": "2026-10-15",
+          "start_date": "2026-10-15",
+          "label": "2026-10-15"
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "period_id": "p4",
+          "pay_date": "2026-10-31",
+          "start_date": "2026-10-31",
+          "label": "2026-10-31"
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "period_id": "p5",
+          "pay_date": "2026-11-15",
+          "start_date": "2026-11-15",
+          "label": "2026-11-15"
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "INCOME": [
+      {
+        "record": {
+          "income_id": "i1",
+          "period_id": "p3",
+          "received_date": "2026-10-15",
+          "amount": 1000,
+          "kind": "SALARY"
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "income_id": "i2",
+          "period_id": "p3",
+          "received_date": "2026-10-16",
+          "amount": 100,
+          "kind": "BONUS"
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "income_id": "i3",
+          "period_id": "p2",
+          "received_date": "2026-09-30",
+          "amount": 900,
+          "kind": "SALARY"
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "income_id": "i4",
+          "period_id": "p3",
+          "received_date": "2026-10-18",
+          "amount": 50,
+          "kind": "OTHER"
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "CATEGORIES": [
+      {
+        "record": {
+          "category_id": "food",
+          "name": "Food",
+          "kind": "SPENDING"
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "category_id": "rent",
+          "name": "Rent",
+          "kind": "SPENDING"
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "category_id": "transport",
+          "name": "Transport",
+          "kind": "SPENDING",
+          "is_archived": true
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "category_id": "fund",
+          "name": "Emergency Fund",
+          "kind": "FUND"
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "category_id": "deleted",
+          "name": "Deleted",
+          "kind": "SPENDING",
+          "deleted_at": "x"
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "FUND_GOALS": [
+      {
+        "record": {
+          "category_id": "fund",
+          "target_amount": 200,
+          "target_date": "2027-01-01"
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "BUDGET_LINES": [
+      {
+        "record": {
+          "line_id": "b1",
+          "period_id": "p3",
+          "category_id": "food",
+          "planned_amount": 30
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "line_id": "b2",
+          "period_id": "p3",
+          "category_id": "rent",
+          "planned_amount": 100
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "line_id": "b3",
+          "period_id": "p3",
+          "category_id": "fund",
+          "planned_amount": 100
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "line_id": "b4",
+          "period_id": "p2",
+          "category_id": "food",
+          "planned_amount": 60
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "TRANSACTIONS": [
+      {
+        "record": {
+          "txn_id": "e1",
+          "period_id": "p3",
+          "txn_date": "2026-10-15",
+          "category_id": "food",
+          "type": "EXPENSE",
+          "amount": 10.1,
+          "note": "<img src=x onerror=alert(1)>"
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "txn_id": "e2",
+          "period_id": "p3",
+          "txn_date": "2026-10-21",
+          "category_id": "food",
+          "type": "EXPENSE",
+          "amount": 10.1
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "txn_id": "e3",
+          "period_id": "p3",
+          "txn_date": "2026-10-22",
+          "category_id": "rent",
+          "type": "EXPENSE",
+          "amount": 100
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "txn_id": "old",
+          "period_id": "p2",
+          "txn_date": "2026-10-01",
+          "category_id": "food",
+          "type": "EXPENSE",
+          "amount": 50
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "txn_id": "mirror",
+          "period_id": "p3",
+          "txn_date": "2026-10-20",
+          "category_id": "rent",
+          "type": "EXPENSE",
+          "amount": 20
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "txn_id": "archived",
+          "period_id": "p3",
+          "txn_date": "2026-10-20",
+          "category_id": "transport",
+          "type": "EXPENSE",
+          "amount": 5
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "txn_id": "deposit",
+          "period_id": "p3",
+          "txn_date": "2026-10-15",
+          "category_id": "fund",
+          "type": "FUND_IN",
+          "amount": 100
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "txn_id": "withdrawal",
+          "period_id": "p3",
+          "txn_date": "2026-10-16",
+          "category_id": "fund",
+          "type": "FUND_OUT",
+          "amount": 20
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "txn_id": "gone",
+          "period_id": "p3",
+          "txn_date": "2026-10-16",
+          "category_id": "food",
+          "type": "EXPENSE",
+          "amount": 999,
+          "deleted_at": "x"
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "LOANS": [
+      {
+        "record": {
+          "loan_id": "loan",
+          "name": "Phone",
+          "total_payable": 100,
+          "principal": 100,
+          "status": "ACTIVE"
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "LOAN_INSTALLMENTS": [
+      {
+        "record": {
+          "installment_id": "ins1",
+          "loan_id": "loan",
+          "due_date": "2026-10-20",
+          "seq_no": 1,
+          "amount_due": 25
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "installment_id": "ins2",
+          "loan_id": "loan",
+          "due_date": "2026-10-25",
+          "seq_no": 2,
+          "amount_due": 25
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "installment_id": "ins3",
+          "loan_id": "loan",
+          "due_date": "2026-11-01",
+          "seq_no": 3,
+          "amount_due": 50
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "LOAN_PAYMENTS": [
+      {
+        "record": {
+          "payment_id": "pay",
+          "loan_id": "loan",
+          "paid_date": "2026-10-20",
+          "amount": 20,
+          "txn_id": "mirror"
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "record": {
+          "payment_id": "pay2",
+          "loan_id": "loan",
+          "paid_date": "2026-10-21",
+          "amount": 10,
+          "txn_id": ""
+        },
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ]
+  },
+  "state": {}
+}

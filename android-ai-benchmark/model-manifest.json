@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "repository": "Qwen/Qwen2.5-0.5B-Instruct-GGUF",
+  "filename": "qwen2.5-0.5b-instruct-q4_k_m.gguf",
+  "revision": null,
+  "sha256": null,
+  "sizeBytes": null,
+  "quantization": "Q4_K_M",
+  "architecture": "qwen2",
+  "embeddingLength": 896,
+  "blockCount": 24,
+  "ggufVersion": 3,
+  "fileType": 15,
+  "license": "Apache-2.0",
+  "source": "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF",
+  "pinStatus": "unresolved: run tools/pin-model.py on a host with official Hugging Face access before importing; CI resolves and bundles an immutable build-specific pin",
+  "runtime": {
+    "repository": "https://github.com/ggml-org/llama.cpp",
+    "revision": "74d4f5b041ad837153b0e90fc864b8290e01d8d5",
+    "tag": "b5046",
+    "license": "MIT",
+    "nativeOptimization": "-O3 -DNDEBUG; baseline armv8-a; CPU only; OpenMP disabled"
+  }
+}
