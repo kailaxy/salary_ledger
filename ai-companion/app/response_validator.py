@@ -1,6 +1,7 @@
 """Bounded heuristics, not proof of factual or emotional safety."""
 import re
 import unicodedata
+from .grounding import grounded, canonical
 
 
 def normalize(text):
@@ -30,8 +31,10 @@ def validate(text, user_message):
         return None
     if re.search(r'\b(your|you have|you owe|remaining|available)\b.*\b(balance|cash|budget|debt|credit score|left)\b', lower):
         return None
+    if not grounded(reply, normalize(user_message)):
+        return None
     numbers = re.findall(r'\d+(?:[,.]\d+)*', reply)
-    if any(n not in re.findall(r'\d+(?:[,.]\d+)*', user_message) for n in numbers):
+    if any(n not in re.findall(r'\d+(?:[,.]\d+)*', canonical(user_message)) for n in numbers):
         return None
     if re.search(r'[$₱€£¥%]|\b(?:pesos?|dollars?|percent)\b', reply, re.I):
         # Even echoed amounts are not verified ledger facts; ordinary counts may be echoed.

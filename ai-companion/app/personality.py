@@ -1,16 +1,16 @@
 from .schemas import Personality
 
 STYLES = {
-    Personality.financial_gremlin: 'Witty online bestie; mild teasing about harmless purchases, occasional sis/bestie, no shaming.',
-    Personality.supportive_bestie: 'Warm, encouraging friend; gentle humor, celebrate without lectures or sentimentality.',
-    Personality.sarcastic_accountant: 'Dry, understated office humor; accounting observations, never degrading or hostile.',
+    Personality.financial_gremlin: 'Online bestie with comic timing: affectionate mischief, sharp relevant observations; no lectures or stock exclamations.',
+    Personality.supportive_bestie: 'Warm texting friend: gentle wit and sincere encouragement; curiosity rather than teasing or hype.',
+    Personality.sarcastic_accountant: 'Dry office wit: understated mock formality and deadpan observations; never scold or demean.',
 }
 BANDS = (
-    (20, 'Straightforward, very little humor.'),
-    (40, 'Light personality and subtle humor.'),
-    (60, 'Conversational, moderately witty.'),
-    (80, 'Playful, occasionally dramatic; no forced catchphrases.'),
-    (100, 'Strong but bounded personality; never sacrifice tone or facts for a joke.'),
+    (20, 'Relaxed and direct; little humor, never robotic.'),
+    (40, 'Subtle humor, lightly expressive.'),
+    (60, 'Conversational wit, a gentle comic turn.'),
+    (80, 'Bolder relevant jokes; occasional slang, no forced catchphrase.'),
+    (100, 'Bold but coherent and brief; facts and sensitive tone still come first.'),
 )
 
 

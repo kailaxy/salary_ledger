@@ -15,3 +15,13 @@ No production web, Android, Apps Script or deterministic engine files changed. T
 Follow README installation and health checks with the existing `gemma3:4b`, then run `python scripts/benchmark.py --supplementary --markdown`. Inspect source/reason and timing fields separately for Gemma and fallback replies. Manually review personality, relevance, restraint and truncation. Check `ollama ps` after successful requests and timeout/cancellation tests.
 
 Actual generation quality, hardware latency and Ollama resource release remain unverified here. Policy and output checks are bounded heuristics, not a reliable safety classifier or financial verification system.
+
+## v1.1 refinement validation
+
+- **132 unit tests passed**, with the same single Starlette/AnyIO dependency deprecation warning. All tests run without live Ollama. `pip check` found no broken requirements.
+- New regressions cover stated counts in words/digits, invented iced/latte/designer properties, changed purchase types, debt-free/credit-score conclusions, unsupported savings achievements, unchanged conservative policy paths, chaos boundaries, compact distinct prompts, optional server seed, report aggregation and exclusive private output files.
+- Started the updated API on an alternate loopback port and ran the real benchmark with `--suite all --supplementary --repeat 2 --markdown`: **66 requests completed, zero Gemma replies**. Verified degraded health, comparison of saved JSON, 0600 result permissions, and refusal to overwrite the JSON/Markdown files. The temporary server was stopped; generated files stayed outside the repository.
+- Live Ollama remains unavailable here. No v1.1 inference timings, output-quality gains, tokenizer savings, hardware improvements or successful model unloading are claimed. The user's observed baseline is preserved in BASELINE.md and the old code at commit 05094f4.
+- Baseline inference options, unloading requests, concurrency limits, localhost boundary, public schemas and production app isolation remain unchanged. The optional seed is unset by default.
+
+The additional grounding lexicons and explicit-negation handling are deliberately narrow. They can miss paraphrases, compound quantities and unsupported properties outside the small vocabulary, and may reject harmless metaphors. Original monetary/percentage restrictions remain conservative. Manually review actual laptop outputs, source-specific timings, cold-load costs, variation and cleanup behavior before claiming improvement.

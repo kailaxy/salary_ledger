@@ -36,8 +36,11 @@ class Config:
     temperature: float = .5
     repeat_penalty: float = 1.15
     max_in_flight: int = 1
+    seed: int | None = None
 
     def __post_init__(self):
+        if self.seed is not None and not 0 <= self.seed <= 2147483647:
+            raise ValueError('OLLAMA_SEED must be 0..2147483647')
         u = urlsplit(self.ollama_url)
         if (u.scheme != 'http' or u.hostname not in ('127.0.0.1', 'localhost', '::1')
                 or u.username or u.password or u.path not in ('', '/') or u.query or u.fragment):
@@ -62,6 +65,7 @@ class Config:
                  'cleanup_timeout': ('OLLAMA_CLEANUP_TIMEOUT', float),
                  'num_ctx': ('OLLAMA_NUM_CTX', int), 'num_predict': ('OLLAMA_NUM_PREDICT', int),
                  'temperature': ('OLLAMA_TEMPERATURE', float), 'repeat_penalty': ('OLLAMA_REPEAT_PENALTY', float),
+                 'seed': ('OLLAMA_SEED', int),
                  'max_in_flight': ('COMPANION_MAX_IN_FLIGHT', int)}
         try:
             return cls(**{k: convert(env[name]) for k, (name, convert) in names.items() if name in env})

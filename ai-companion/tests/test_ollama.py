@@ -48,3 +48,17 @@ def test_literal_dotenv_and_secret_repr(tmp_path):
     p=tmp_path/'.env';p.write_text('COMPANION_PORT=8765\nCOMPANION_TOKEN="$(not executed)"\n')
     assert read_dotenv(p)['COMPANION_TOKEN']=='$(not executed)'
     assert 'a'*32 not in repr(Config(token='a'*32))
+
+
+def test_seed_is_server_configured_and_optional():
+    async def run():
+        payloads=[]
+        def handler(request):
+            payloads.append(json.loads(request.content))
+            return httpx.Response(200,json={'done':True,'message':{'role':'assistant','content':'Hello there!'}})
+        client=OllamaClient(Config(seed=42),httpx.MockTransport(handler))
+        await client.generate([])
+        assert payloads[0]['options']['seed']==42
+        assert payloads[0]['keep_alive']==0
+        await client.close()
+    asyncio.run(run())

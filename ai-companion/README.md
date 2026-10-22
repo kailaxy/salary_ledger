@@ -79,11 +79,11 @@ There is no permissive CORS middleware. Cross-origin browser requests with Origi
 
 ## Personality, tone and policy
 
-Central style specifications implement three presets and five chaos bands: 0–20 straightforward, 21–40 subtle, 41–60 witty, 61–80 playful, 81–100 expressive but bounded. Tone and policy always override chaos. Prompts use concise English and one tone-related demonstration (never more than three); the user message stays a separate, untrusted user message.
+Central style specifications implement three presets and five chaos bands: 0–20 straightforward, 21–40 subtle, 41–60 witty, 61–80 playful, 81–100 expressive but bounded. Tone and policy always override chaos. Prompts use concise English and one personality/tone-specific demonstration above chaos 20, otherwise none (never more than three); the user message stays a separate, untrusted user message.
 
 A deliberately limited pattern policy bypasses generation for medical expenses, expressed hardship, essential spending, explicitly supportive requests, financial questions without ledger data, and unsupported record/tool requests. Contradictory playful/celebratory labels do not override these paths. The API cannot accept verified ledger facts in this phase and never computes a financial answer. Milestone reactions respond to a user's statement, not an independently verified achievement.
 
-Free-form output is normalized and checked for length, repeated phrases/catchphrases, excessive capitals, obvious action-completion claims, common authoritative financial claims and unsupported numbers. Ordinary counts already mentioned by the user can be echoed; currency/percentage output is rejected conservatively even if supplied by the user. Obvious truncation and malformed output fall back without retries. All sensitive/factual fallbacks are restrained at every personality/chaos level. Ordinary fallback wording avoids inventing a purchase where none was mentioned.
+Free-form output is normalized and checked for length, repeated phrases/catchphrases, excessive capitals, obvious action-completion claims, common authoritative financial claims and unsupported numbers. Ordinary counts already mentioned by the user can be echoed; currency/percentage output is rejected conservatively even if supplied by the user. Obvious truncation and malformed output fall back without retries. Additional narrow grounding checks reject common purchase-type/property drift, changed adjacent purchase counts (including number words zero–twenty), broader debt-freedom/credit-score conclusions, and unsupported savings-goal or overspending claims. These checks do not cover arbitrary semantic paraphrases; negation handling is intentionally limited. Harmless figurative language can be rejected. All sensitive/factual fallbacks are restrained at every personality/chaos level. Ordinary fallback wording avoids inventing a purchase where none was mentioned.
 
 **These are bounded heuristics, not comprehensive sentiment recognition, prompt-injection prevention, factual verification or proof of safety.** They can miss implications, insults, number words, paraphrases and nuanced hardship; they can also reject harmless replies. No automatic humor score is used. A future client must render replies as untrusted plain text, outside canonical figures, transaction details, caveats and save/sync status, with deterministic content always authoritative.
 
@@ -122,6 +122,7 @@ Environment variables override literal `.env` entries. Restart after changes.
 | OLLAMA_NUM_PREDICT | 55 | 16–128 output tokens |
 | OLLAMA_TEMPERATURE | 0.5 | 0–1 |
 | OLLAMA_REPEAT_PENALTY | 1.15 | 1–2 |
+| OLLAMA_SEED | unset | Optional server-side integer 0–2147483647; restart after changing |
 | COMPANION_MAX_IN_FLIGHT | 1 | 1 or 2; prefer 1 on the specified 16 GB laptop |
 
 ## Tests and real HTTP benchmark
@@ -152,3 +153,49 @@ Normal tests mock Ollama and need no model, GPU, real ledger, network provider o
 ## Future private phone-access boundary (not implemented)
 
 A separate phase must choose private Tailscale access or an authenticated local proxy, explicit device authentication/revocation, token storage outside frontend assets, transport encryption, rate limits and request size limits, authorization independent of network membership, and background/cancel/session invalidation. Keep Ollama itself on loopback. No public port forwarding, tunnel or Tailscale Funnel belongs in this design. Only a narrow conversation endpoint may cross that boundary; no financial tools, ledger authority, raw Ollama proxy, credentials or executable payloads. Require explicit user invocation and retain the deterministic app without the laptop/model.
+
+
+## v1.1 update and benchmark workflow (Linux Mint)
+
+First stop the running API with **Ctrl+C** in its terminal. Inspect local modifications before pulling; commit or stash tracked edits you want to preserve. Do not discard them to resolve a pull conflict. Your ignored `.env`, `.venv` and results stay local; make a separate backup of important results before moving files.
+
+```bash
+cd ~/Projects/salary_ledger
+git status --short
+git pull --ff-only origin main
+cd ai-companion
+source .venv/bin/activate
+pip install -r requirements.txt
+# Keep your existing .env; do not replace it with the example.
+./scripts/start.sh
+```
+
+In a second terminal:
+
+```bash
+cd ~/Projects/salary_ledger/ai-companion
+source .venv/bin/activate
+curl http://127.0.0.1:8765/health
+# Same original 14 scenarios:
+python scripts/benchmark.py --supplementary --markdown
+# Separate 19-case quality suite, repeated three times:
+python scripts/benchmark.py --suite quality --repeat 3 --markdown
+# Both suites, all three personalities in separate runs:
+python scripts/benchmark.py --suite all --supplementary --repeat 2 --personality financial_gremlin --chaos 70 --markdown
+python scripts/benchmark.py --suite all --supplementary --repeat 2 --personality supportive_bestie --chaos 50 --markdown
+python scripts/benchmark.py --suite all --supplementary --repeat 2 --personality sarcastic_accountant --chaos 70 --markdown
+```
+
+The health curl needs your configured Authorization header if authentication is enabled; benchmark scripts read the local token themselves. All benchmark prompts are synthetic. Default filenames now include a UTC timestamp; explicit `--output` paths are refused if already present (including their Markdown companion). Existing results are preserved. Each case records run/scenario identifiers, input/effective tone, source/reason, preset/chaos, token counters and available timings. Existing flags and original scenario order remain supported.
+
+For repeatable experiments, optionally uncomment `OLLAMA_SEED=42` in `.env`, then restart the API. This adds a server-controlled Ollama seed without changing the public request schema. Leave it unset to preserve baseline behavior. A fixed seed does not guarantee identical output across Ollama/model/hardware versions; compare unseeded repeated runs for natural variation too. Recorded configuration is the benchmark process's local snapshot, not remotely attested server configuration: keep server and benchmark settings matched.
+
+Compare saved runs (replace paths with actual filenames):
+
+```bash
+python scripts/compare.py results/v1-baseline.local.json results/benchmark-YOUR-TIMESTAMP.local.json
+```
+
+The utility accepts original v1 JSON rows. It reports source counts, average/median/min/max client latency separately for generated/fallback replies, handler duration, load/prompt-evaluation/generation/total model milliseconds, token counts, output word lengths, fallback reasons and common two-word generated openings. Missing metrics remain null rather than zero. Markdown benchmark output includes the same summary. Repeated openings are a development diagnostic, not an automated humor score; fallbacks are excluded from that opening report.
+
+See [BASELINE.md](BASELINE.md) for the supplied laptop baseline and optional old-commit workflow, and [VALIDATION.md](VALIDATION.md) for actual cloud checks. The baseline inference options, one-generation admission, no retries and `keep_alive:0` remain unchanged. Shorter instructions and zero/one examples bound prompt overhead, but actual tokenizer counts and speed require laptop measurements; prompt changes cannot eliminate cold loading. Review jokes, relevance, factual anchoring and variety manually across matched runs. Neither 14 nor 19 passing scenarios establishes comprehensive conversational reliability.

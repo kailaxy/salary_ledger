@@ -41,7 +41,8 @@ class OllamaClient:
             data = await self._json('POST', '/api/chat', json={
                 'model': c.model, 'messages': messages, 'stream': False, 'keep_alive': 0,
                 'options': {'num_ctx': c.num_ctx, 'num_predict': c.num_predict,
-                            'temperature': c.temperature, 'repeat_penalty': c.repeat_penalty}})
+                            'temperature': c.temperature, 'repeat_penalty': c.repeat_penalty,
+                            **({'seed': c.seed} if c.seed is not None else {})}})
         if not isinstance(data, dict) or data.get('done') is not True or (data.get('message') or {}).get('role') != 'assistant':
             raise ValueError('Malformed Ollama response')
         if data.get('done_reason') == 'length':
