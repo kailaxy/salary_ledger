@@ -285,7 +285,7 @@
   /* ---------- bottom tabs ---------- */
   .tabs{
     position:absolute; left:0; right:0; bottom:0;
-    display:grid; grid-template-columns:repeat(5,1fr);
+    display:grid; grid-template-columns:repeat(6,minmax(0,1fr));
     padding-bottom:env(safe-area-inset-bottom,0px);
     background:var(--card); border-top:1px solid var(--rule-strong);
   }
@@ -526,6 +526,12 @@
   .assistant-preview-summary{white-space:pre-line;padding:12px;border:1px solid var(--rule);border-radius:12px;font-size:13px;overflow-wrap:anywhere}
   .assistant-answer>.btn2{margin:4px 6px 4px 0;max-width:100%;white-space:normal}.assistant-answer input{max-width:100%;box-sizing:border-box;min-height:44px;border:1px solid var(--rule);border-radius:10px;padding:8px;background:var(--paper);color:inherit}
   .assistant-save-status{font-size:13px;font-weight:600;padding-top:8px}.assistant-reaction{font-size:14px;margin-top:12px}.assistant-command-list{display:grid;gap:6px;max-height:260px;overflow:auto;margin-top:10px}.assistant-command-list .btn2{text-align:left;white-space:normal}
+  .calendar-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}.calendar-toolbar h2{font-size:20px;margin:0}.calendar-toolbar .icon-btn{font-size:28px;min-width:44px;min-height:44px}
+  .calendar-tools{display:flex;align-items:end;gap:12px;margin:14px 0}.calendar-tools .fld{flex:1;min-width:0;margin:0}.calendar-tools input{max-width:100%;min-width:0;box-sizing:border-box}
+  .calendar-week,.calendar-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}.calendar-week{font-size:10px;text-align:center;color:var(--ink-mute);margin-bottom:8px}
+  .calendar-day{position:relative;min-height:44px;border:0;border-radius:12px;background:transparent;color:var(--ink);font:500 14px 'Inter',sans-serif;cursor:pointer;padding:5px 0 12px}.calendar-day[aria-current]{box-shadow:inset 0 0 0 1px var(--rule-strong)}.calendar-day[aria-pressed="true"]{background:var(--ink);color:var(--card)}.calendar-day:focus-visible{outline:2px solid var(--ink);outline-offset:1px}.calendar-dot{position:absolute;bottom:6px;left:calc(50% - 2px);height:4px;width:4px;background:currentColor;border-radius:50%}
+  .calendar-record{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;border:0;border-top:1px solid var(--rule);background:transparent;text-align:left;color:var(--ink);padding:16px 0;cursor:pointer;font:inherit}.calendar-record>span{min-width:0;overflow-wrap:anywhere}.calendar-record-detail{display:block;font-size:12px;line-height:1.6;color:var(--ink-mute);margin-top:4px}.calendar-record-amount{font-size:15px;white-space:nowrap}.calendar-record:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+  .settings-section{border-bottom:1px solid var(--rule);padding:4px 0}.settings-section>summary{cursor:pointer;min-height:48px;display:flex;align-items:center;justify-content:space-between;font-weight:600;font-size:15px;list-style:none}.settings-section>summary::-webkit-details-marker{display:none}.settings-section>summary:after{content:'+';font-size:20px;font-weight:400}.settings-section[open]>summary:after{content:'−'}.settings-section-body{padding:4px 0 18px}.settings-section .personality-settings{border:0;padding-top:0;margin-top:0}
 </style>
 </head>
 <body>
@@ -563,6 +569,7 @@
     </section><div id="homeSummary"></div></section>
     <section class="panel" id="panel-plan" role="tabpanel" aria-labelledby="tab-plan"></section>
     <section class="panel" id="panel-add" role="tabpanel" aria-labelledby="tab-add"></section>
+    <section class="panel" id="panel-records" role="tabpanel" aria-labelledby="tab-records"></section>
     <section class="panel" id="panel-funds" role="tabpanel" aria-labelledby="tab-funds"></section>
     <section class="panel" id="panel-loans" role="tabpanel" aria-labelledby="tab-loans"></section>
   </main>
@@ -582,6 +589,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="2"/><path d="M12 8v8M8 12h8"/></svg>
       Add
     </button>
+    <button class="tab" id="tab-records" role="tab" data-tab="records" aria-controls="panel-records" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18m-12 4h2m3 0h2m-7 4h2"/></svg>Records</button>
     <button class="tab" id="tab-funds" role="tab" data-tab="funds" aria-controls="panel-funds" type="button">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>
       Funds
@@ -610,11 +618,12 @@
         </button>
       </div>
       <div id="settingsView">
-        <p id="localStatus" role="status" style="font-size:13px;line-height:1.5"></p>
+        <details class="settings-section" id="settingsSync"><summary>Sync &amp; device</summary><div class="settings-section-body"><p id="localStatus" role="status" style="font-size:13px;line-height:1.5"></p>
         <div id="nativeDeviceSettings" hidden><p class="sub">This APK keeps its own offline copy. Connect once to download your Sheet; reconnect here if access is revoked.</p><button class="btn2" type="button" data-act="connectdevice" id="connectDeviceBtn" style="margin:12px 0">Connect this device</button></div>
+        </div></details>
         <div id="settingsBody"></div>
-        <section class="personality-settings" id="personalitySettings" aria-labelledby="personalityHeading" hidden>
-          <h3 id="personalityHeading">Assistant Personality</h3>
+        <details class="settings-section" id="settingsPersonality" hidden><summary>Assistant personality</summary><div class="settings-section-body"><section class="personality-settings" id="personalitySettings" aria-labelledby="personalityHeading" hidden>
+          <h3 id="personalityHeading" class="sr-only">Assistant Personality</h3>
           <p class="hint">A little character around the same verified facts. Changes save automatically on this device, for this ledger.</p>
           <label class="fld"><span class="label">Personality</span><select id="personalityPreset" aria-describedby="personalityDescription"></select></label>
           <p class="hint" id="personalityDescription"></p>
@@ -630,8 +639,8 @@
             <p id="personalityPreviewCaveat" class="hint"></p>
           </div>
           <div class="personality-footer"><button class="btn2" id="personalityReset" type="button">Restore defaults</button><p id="personalitySaveStatus" class="hint" role="status"></p></div>
-        </section>
-        <div class="guide-nav"><button class="btn2" id="guideBtn" type="button" data-act="openguide">Guide</button></div>
+        </section></div></details>
+        <details class="settings-section" id="settingsHelp"><summary>Help &amp; guide</summary><div class="settings-section-body"><div class="guide-nav"><button class="btn2" id="guideBtn" type="button" data-act="openguide">Guide</button></div></div></details>
       </div>
       <div id="guideView" hidden>
         <button class="btn2" id="guideBack" type="button" data-act="backsettings">Back to settings</button>
@@ -708,6 +717,8 @@
           <p>Personality adds tone around the same verified amounts, dates, explanations and warnings. Overdue debt, shortfalls and missing information always receive gentle responses. No AI model or download is involved.</p>
           <h4>Refresh (arrow icon)</h4>
           <p>Synchronizes confirmed changes and downloads the latest cloud copy. Home shows retries and conflicts. Review current cloud values before discarding a proposal; related pending changes may also need review.</p>
+          <h3>Records calendar</h3><p>Open Records in the bottom navigation. Dots mark dates with saved or non-conflicting pending records. Choose a date to see that day’s income, expenses, fund movements and loan payments; tap a record to edit it. Category and plan assignment remain optional for expenses, and every change uses the existing review and confirmation. A loan payment and its linked expense appear once. Use the month arrows, Today or Go to date to browse.</p>
+          <p>Settings sections expand and collapse independently: Sync &amp; device, App settings, Pay periods, Assistant personality, and Help &amp; guide.</p>
           <h3>Good habits</h3>
           <ul>
           <li>Record salary first each pay period, then log expenses as they happen.</li>
@@ -1180,6 +1191,27 @@ root.LedgerQuery={query:query,validate:validate,interpret:interpret,cents:cents,
 </script>
 <!-- QUERY:END -->
 
+<!-- CALENDAR:START -->
+<script>
+/* Read-only calendar projection. Stored ISO dates are ledger dates, never UTC-shifted timestamps. */
+(function(root){
+'use strict';
+function validDate(value){return typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&value>='2000-01-01'&&value<='2100-12-31'&&Number.isFinite(Date.parse(value+'T00:00:00Z'))&&new Date(value+'T00:00:00Z').toISOString().slice(0,10)===value;}
+function month(value){if(!/^\d{4}-\d{2}$/.test(value)||!validDate(value+'-01'))throw Error('Choose a valid calendar month.');var year=+value.slice(0,4),m=+value.slice(5),days=new Date(Date.UTC(year,m,0)).getUTCDate(),offset=(new Date(value+'-01T00:00:00Z').getUTCDay()+6)%7;return {label:new Intl.DateTimeFormat('en',{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(value+'-01T00:00:00Z')),offset:offset,dates:Array.from({length:days},function(_,i){return value+'-'+String(i+1).padStart(2,'0');})};}
+function shift(value,delta){if(!validDate(value)||!Number.isInteger(delta))throw Error('Invalid calendar date.');var date=new Date(value+'T00:00:00Z');date.setUTCDate(date.getUTCDate()+delta);var result=date.toISOString().slice(0,10);return validDate(result)?result:value;}
+function records(snapshot,entries){
+ if(!snapshot||!snapshot.tables)return [];var t=snapshot.tables;
+ function live(table){return (t[table]||[]).map(function(x){return x.record;}).filter(function(r){return !r.deleted_at;});}
+ var categories=live('CATEGORIES'),loans=live('LOANS'),payments=live('LOAN_PAYMENTS'),mirrors={},status={};payments.forEach(function(p){if(p.txn_id)mirrors[p.txn_id]=true;});
+ (entries||[]).forEach(function(e){var changes=e.payload.table==='OPERATIONS'&&e.proposalRecord?e.proposalRecord.changes||[]:[{table:e.payload.table,after:e.proposalRecord}];changes.forEach(function(c){var r=c.after;if(!r)return;var id=c.table==='INCOME'?r.income_id:c.table==='LOAN_PAYMENTS'?r.payment_id:r.txn_id;if(id)status[c.table+':'+id]=e.status==='conflict'?'Conflict · review on Home':'Pending sync';});});
+ var result=[];['INCOME','TRANSACTIONS','LOAN_PAYMENTS'].forEach(function(table){live(table).forEach(function(r){if(table==='TRANSACTIONS'&&mirrors[r.txn_id])return;var income=table==='INCOME',payment=table==='LOAN_PAYMENTS',category=categories.find(function(c){return c.category_id===r.category_id;}),loan=loans.find(function(l){return l.loan_id===r.loan_id;}),date=income?r.received_date:payment?r.paid_date:r.txn_date,id=income?r.income_id:payment?r.payment_id:r.txn_id;
+ if(!validDate(date))return;result.push({table:table,id:id,date:date,amount:r.amount,note:r.note||'',name:income?r.source||r.kind:payment?loan?loan.name:'Loan payment':category?category.name:'Uncategorized',kind:income?'Income':payment?'Loan payment':r.type==='FUND_IN'?'Fund deposit':r.type==='FUND_OUT'?'Fund withdrawal':'Expense',status:status[table+':'+id]||'',linked:!!r.period_id,alsoSpend:payment&&!!r.txn_id});});});return result.sort(function(a,b){return b.date.localeCompare(a.date)||a.kind.localeCompare(b.kind)||a.id.localeCompare(b.id);});
+}
+root.RecordCalendar={validDate:validDate,month:month,shift:shift,records:records};
+})(typeof window!=='undefined'?window:globalThis);
+</script>
+<!-- CALENDAR:END -->
+
 <!-- ACTIONS:START -->
 <script>
 /* Deterministic capability allowlist. No transport, storage, model or dynamic dispatch. */
@@ -1195,7 +1227,7 @@ register('fund.withdraw','Withdraw from a fund','funds','entry','Withdraw 100 fr
 [
  ['expense.update','Edit an expense','history','Change my last expense'],['expense.delete','Delete a precisely identified expense','history','Delete my last expense'],
  ['income.update','Edit income','history','Edit income'],['income.delete','Delete income','history','Delete income'],
- ['ledger.search','Search record history','history','Show my transaction history'],['ledger.summary','Overview','home','Open home'],
+ ['ledger.search','Search record history','records','Show my transaction history'],['ledger.summary','Overview','home','Open home'],
  ['category.create','Create a spending category','newcategory','Create a category'],['category.rename','Rename a category','plan','Rename my Transport category'],
  ['category.archive','Archive a category','plan','Archive a category'],['category.restore','Restore an archived category','plan','Restore a category'],['category.delete','Delete an unused category','plan','Delete an unused category'],
  ['budget.view','Review plans','plan','Open my budgets'],['budget.set','Change a plan allocation','plan','Edit my food budget'],['budget.compare','Compare plans and actuals','plan','Take me to budget planning'],
@@ -1866,7 +1898,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
   };
   var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  var TITLES = { home:'Overview', plan:'Plan', add:'Add record', funds:'Funds', loans:'Loans' };
+  var TITLES = { home:'Overview', plan:'Plan', add:'Add record', records:'Records', funds:'Funds', loans:'Loans' };
   var data = null, busy = false, saving = false, ledgerSnapshot = null, snapshotStale = false;
   var cloudSnapshot=null, pendingEntries=[], syncing=false, syncPromise=null, editDraft=null, syncRequested=false;
   var localStatus = 'No complete local snapshot yet.';
@@ -1998,18 +2030,18 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
   function tile(k, v){ return '<p><span class="k">' + esc(k) + '</span><br><span class="v">' + peso(v) + '</span></p>'; }
   function settingsHTML(d){
     var next = d.years.length ? Math.max.apply(null, d.years) + 1 : new Date().getFullYear();
-    return '<form id="setForm" novalidate autocomplete="off">' +
+    return '<details class="settings-section" id="settingsGeneral"><summary>App settings</summary><div class="settings-section-body"><form id="setForm" novalidate autocomplete="off">' +
       '<label class="fld"><span class="label">App name</span><input id="sName" type="text" maxlength="30" value="' + esc(d.settings.appName) + '"></label>' +
       '<label class="fld"><span class="label">Pay days</span><input id="sDays" type="text" value="' + esc(d.settings.payDays) + '" placeholder="15,EOM"></label>' +
       '<p class="hint">Day numbers 1 to 28, or EOM for end of month. Applies to periods you add next, not existing ones.</p>' +
-      '<button class="btn2 solid" type="submit">Save settings</button></form>' +
-      '<form id="yrForm" novalidate autocomplete="off" style="margin-top:18px;padding-top:16px;border-top:1px dashed var(--rule-strong)"><div class="two" style="align-items:end">' +
+      '<button class="btn2 solid" type="submit">Save settings</button></form></div></details>' +
+      '<details class="settings-section" id="settingsPeriods"><summary>Pay periods</summary><div class="settings-section-body"><form id="yrForm" novalidate autocomplete="off"><div class="two" style="align-items:end">' +
       '<label class="fld" style="margin:0"><span class="label">Add pay periods for year</span><input id="sYear" type="text" inputmode="numeric" maxlength="4" value="' + next + '"></label>' +
-      '<button class="btn2" type="submit">Add periods</button></div></form>';
+      '<button class="btn2" type="submit">Add periods</button></div></form></div></details>';
   }
   var settingsOpen = false, personalityLedgerId = null, personalityTurn = 0;
   function fillPersonality(){
-    var section=$('#personalitySettings');section.hidden=!ledgerSnapshot;
+    var section=$('#personalitySettings');section.hidden=!ledgerSnapshot;$('#settingsPersonality').hidden=!ledgerSnapshot;
     if(!ledgerSnapshot)return;
     var select=$('#personalityPreset'),presets=AssistantPersonality.getPresets();
     if(!select.options.length)presets.forEach(function(p){var option=document.createElement('option');option.value=p.id;option.textContent=p.name;select.appendChild(option);});
@@ -2058,7 +2090,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
   function assistantNavigate(screen){
     assistantCancel();
     switch(screen){
-      case 'home':showTab('home');break;case 'plan':showTab('plan');break;case 'funds':showTab('funds');break;case 'loans':showTab('loans');break;
+      case 'records':showTab('records');break;case 'home':showTab('home');break;case 'plan':showTab('plan');break;case 'funds':showTab('funds');break;case 'loans':showTab('loans');break;
       case 'add':showTab('add');break;
       case 'history':showTab('add');$('#entryHistory').open=true;renderHistory();$('#historySearch').focus();break;
       case 'settings':openSettings();break;case 'guide':openSettings();showGuide(true);break;
@@ -2420,6 +2452,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
     addType=table==='INCOME'?'Income':table==='LOAN_PAYMENTS'?'Loan':item.record.type==='EXPENSE'?'Expense':'Fund';fillAdd();showTab('add');
     var r=item.record;$('#fAmount').value=nf.format(r.amount);$('#fDate').value=table==='INCOME'?r.received_date:table==='LOAN_PAYMENTS'?r.paid_date:r.txn_date;$('#fPeriod').value=r.period_id;$('#fNote').value=r.note||'';
     if(table==='INCOME'){$('#fKind').value=r.kind;$('#fSource').value=r.source||'';}else if(table==='LOAN_PAYMENTS'){var expense=ledgerSnapshot.tables.TRANSACTIONS.find(function(x){return x.record.txn_id===r.txn_id;});$('#fLoan').value=r.loan_id;$('#fAlso').checked=!!r.txn_id;fillAdd();if(expense){$('#fCat').value=expense.record.category_id;$('#fPeriod').value=expense.record.period_id;}}else{$('#fCat').value=r.category_id;$('#fDir').value=r.type==='FUND_OUT'?'OUT':'IN';}
+    var recordPeriod=table==='LOAN_PAYMENTS'?(expense?expense.record.period_id:''):r.period_id;fillAdd();$('#fPeriod').value=recordPeriod||'';
     setMsg('addMsg','Editing '+id+'. Changes will be reviewed before saving.');
   }
   async function submitLoanLocal(rec){
@@ -2568,6 +2601,22 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
     var l = byId(data.loans, $('#fLoan').value);
     if (l && l.next && !$('#fAmount').value) $('#fAmount').value = nf.format(l.next.left);
   }
+  var calendarDate=null,calendarMonth=null,calendarLedger=null;
+  function renderCalendar(){
+    if(!ledgerSnapshot||!data)return;
+    if(calendarLedger!==ledgerSnapshot.ledgerId){calendarLedger=ledgerSnapshot.ledgerId;calendarDate=data.today;calendarMonth=calendarDate.slice(0,7);}
+    var panel=$('#panel-records');if(!$('#calendarDays'))panel.innerHTML='<section class="card record-calendar" aria-label="Record calendar"><div class="calendar-toolbar"><button class="icon-btn" data-act="calprev" type="button" aria-label="Previous month">‹</button><h2 id="calendarMonth"></h2><button class="icon-btn" data-act="calnext" type="button" aria-label="Next month">›</button></div><div class="calendar-tools"><label class="fld"><span class="label">Go to date</span><input type="date" id="calendarJump" min="2000-01-01" max="2100-12-31"></label><button class="btn2" data-act="caltoday" type="button">Today</button></div><div class="calendar-week" aria-hidden="true"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div><div id="calendarDays" class="calendar-days" role="group" aria-label="Choose a date"></div><p class="hint">Dots mark days with records. Select a day to browse.</p></section><section class="card"><h2 id="calendarHeading" class="h2"></h2><p class="hint" id="calendarCount" role="status"></p><div id="calendarRecords"></div></section>';
+    var model=RecordCalendar.month(calendarMonth),rows=RecordCalendar.records(ledgerSnapshot,pendingEntries),counts={};rows.forEach(function(r){counts[r.date]=(counts[r.date]||0)+1;});
+    $('#calendarMonth').textContent=model.label;$('#calendarJump').value=calendarDate;$('#calendarDays').textContent='';
+    for(var i=0;i<model.offset;i++){var blank=document.createElement('span');blank.setAttribute('aria-hidden','true');$('#calendarDays').appendChild(blank);}
+    model.dates.forEach(function(date,index){var b=document.createElement('button');b.type='button';b.className='calendar-day';b.dataset.act='caldate';b.dataset.date=date;b.textContent=String(index+1);b.setAttribute('aria-label',fmtLong(date)+' · '+(counts[date]||0)+' records');b.setAttribute('aria-pressed',String(date===calendarDate));b.tabIndex=date===calendarDate||calendarDate.slice(0,7)!==calendarMonth&&index===0?0:-1;if(date===data.today)b.setAttribute('aria-current','date');if(counts[date]){var dot=document.createElement('span');dot.className='calendar-dot';dot.setAttribute('aria-hidden','true');b.appendChild(dot);}$('#calendarDays').appendChild(b);});
+    $('[data-act="calprev"]').disabled=calendarMonth==='2000-01';$('[data-act="calnext"]').disabled=calendarMonth==='2100-12';
+    var selected=rows.filter(function(r){return r.date===calendarDate;});$('#calendarHeading').textContent=fmtLong(calendarDate);$('#calendarCount').textContent=selected.length?selected.length+' record'+(selected.length===1?'':'s')+' · Tap a record to edit.':'No records for this day.';
+    $('#calendarRecords').textContent='';selected.forEach(function(r){var b=document.createElement('button');b.type='button';b.className='calendar-record';b.dataset.act='caledit';b.dataset.table=r.table;b.dataset.id=r.id;var info=document.createElement('span'),name=document.createElement('strong'),description=document.createElement('span'),amount=document.createElement('strong');name.textContent=r.note||r.name;description.className='calendar-record-detail';description.textContent=r.kind+' · '+r.name+(r.kind==='Expense'?(r.linked?' · Plan linked':' · No plan linked'):'')+(r.alsoSpend?' · Also counted as spending':'')+(r.status?' · '+r.status:'');info.appendChild(name);info.appendChild(description);amount.className='calendar-record-amount';amount.textContent=peso(r.amount);b.appendChild(info);b.appendChild(amount);$('#calendarRecords').appendChild(b);});
+  }
+  function selectCalendarDate(date,focus){if(!RecordCalendar.validDate(date))return;calendarDate=date;calendarMonth=date.slice(0,7);renderCalendar();if(focus){var day=$('#calendarDays [data-date="'+date+'"]');if(day)day.focus();}}
+  function moveCalendarMonth(delta){var start=new Date(calendarMonth+'-01T00:00:00Z');start.setUTCMonth(start.getUTCMonth()+delta);var month=start.toISOString().slice(0,7);if(month<'2000-01'||month>'2100-12')return;calendarMonth=month;calendarDate=month+'-01';renderCalendar();$('[data-act="'+(delta<0?'calprev':'calnext')+'"]').focus();}
+
   var historyLimit=40;
   function renderHistory(){
     var box=$('#entryHistory');if(!box||!box.open||!ledgerSnapshot)return;
@@ -2702,7 +2751,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
     updateAssistantSource();
     fillPlan(); fillAdd();
     $('#panel-funds').innerHTML = fundsHTML(data);
-    fillLoans(); fillSettings();
+    fillLoans(); fillSettings();renderCalendar();
     var cur = period(data.currentPeriodId);
     $('#eyebrow').textContent = data.app.name + (cur ? ' · ' + perLabel(cur) : '');
     $('#lockName').textContent = data.app.name;
@@ -2720,6 +2769,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
     $$('.panel').forEach(function(p){ p.classList.toggle('on', p.id === 'panel-' + name); });
     $('#screenTitle').textContent = TITLES[name];
     if (!keepScroll) $('#main').scrollTop = 0;
+    if(name==='records'&&data)renderCalendar();
     if (data) reveal($('#panel-' + name));
   }
 
@@ -2767,8 +2817,12 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
     if (t.hasAttribute('data-tab')) { showTab(t.getAttribute('data-tab')); return; }
     var act = t.getAttribute('data-act'), id = t.getAttribute('data-id');
     if(act==='connectdevice'){var connect=$('#connectDeviceBtn');connect.disabled=true;LedgerNative.pair().then(function(){toast('Device connected. Downloading your ledger…');return load();}).catch(function(error){if(!/PAIR_CANCELLED/.test(error.message))toast(error.message,true);}).finally(function(){connect.disabled=false;});}
+    else if(act==='caldate')selectCalendarDate(t.getAttribute('data-date'),true);
+    else if(act==='calprev')moveCalendarMonth(-1);
+    else if(act==='calnext')moveCalendarMonth(1);
+    else if(act==='caltoday')selectCalendarDate(data.today,true);
     else if(act==='morehistory'){historyLimit+=40;renderHistory();}
-    else if(act==='editentry')editEntry(t.getAttribute('data-table'),id);
+    else if(act==='editentry'||act==='caledit')editEntry(t.getAttribute('data-table'),id);
     else if(act==='canceledit')cancelEdit();
     else if(act==='retrysync')load();
     else if(act==='resolvecloud')resolveCloud(id);
@@ -2792,7 +2846,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
     else if (act === 'payloan') { addType = 'Loan';if(cloudSnapshot.capabilities.optionalPlanningVersion===1)$('#fPeriod').value=''; showTab('add'); fillAdd(); $('#fLoan').value = id; $('#fAmount').value = ''; fillAdd(); prefillLoan(); }
   });
   document.addEventListener('change', function(e){
-    var t = e.target;if(t&&t.id==='personalityPreset'){savePersonality(false);return;} if (!t || !data) return;
+    var t = e.target;if(t&&t.id==='calendarJump'){selectCalendarDate(t.value,false);return;}if(t&&t.id==='personalityPreset'){savePersonality(false);return;} if (!t || !data) return;
     if (t.classList && t.classList.contains('plan-in')) savePlanLine(t);
     else if (t.id === 'planPer') { planPer = t.value; fillPlan(); reveal($('#panel-plan')); }
     else if (t.id === 'fAlso') fillAdd();
@@ -2854,6 +2908,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
     if (!v) { $('#pinErr').textContent = 'Type your PIN first.'; return; }
     pin = v; store.set('sl2_pin', v); $('#pinErr').textContent = ''; load();
   });
+  document.addEventListener('keydown',function(e){if(!e.target.matches('.calendar-day'))return;var delta={ArrowLeft:-1,ArrowRight:1,ArrowUp:-7,ArrowDown:7}[e.key];if(delta!==undefined){e.preventDefault();selectCalendarDate(RecordCalendar.shift(e.target.dataset.date,delta),true);}});
   $('.tabs').addEventListener('keydown', function(e){
     var keys = Object.keys(TITLES), i = keys.indexOf(tab);
     if (e.key === 'ArrowRight') i = (i + 1) % keys.length;

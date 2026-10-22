@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict');
 module.exports=async function personalityChecks({page,native,snapshot}){
- async function open(){await page.locator('#settingsBtn').click();await page.waitForFunction(()=>document.activeElement.id==='setClose');await page.locator('#personalitySettings').scrollIntoViewIfNeeded();}
+ async function open(){await page.locator('#settingsBtn').click();await page.waitForFunction(()=>document.activeElement.id==='setClose');if(!await page.locator('#settingsPersonality').evaluate(el=>el.open))await page.locator('#settingsPersonality > summary').click();await page.locator('#personalitySettings').scrollIntoViewIfNeeded();}
  async function ask(text){await page.locator('#assistantInput').fill(text);await page.locator('#assistantInput').press('Enter');return page.locator('.assistant-answer').last();}
  async function select(id){await page.locator('#personalityPreset').selectOption(id);}
  async function chaos(n){await page.locator('#personalityChaos').evaluate((el,value)=>{el.value=String(value);el.dispatchEvent(new Event('input',{bubbles:true}));},n);}

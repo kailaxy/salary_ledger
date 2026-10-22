@@ -34,7 +34,7 @@ async function countQueue(page,count){for(let i=0;i<100;i++){if(await page.evalu
  if(/https:\/\/fonts\.(googleapis|gstatic)\.com/.test(html))throw Error('Packaged HTML has external font dependencies');
  await page.route('**/*',route=>{if(route.request().url()===ORIGIN+'/assets/Index.html')return route.fulfill({contentType:'text/html',headers:{'Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"},body:html});remote.push(route.request().url());return route.abort();});
  await page.goto(ORIGIN+'/assets/Index.html');await page.locator('#banner').filter({hasText:'Connect this device'}).waitFor();
- await page.locator('#settingsBtn').click();await page.locator('#connectDeviceBtn').click();await page.waitForFunction(()=>document.querySelector('#assistantSource').textContent.includes('Updated'));
+ await page.locator('#settingsBtn').click();await page.locator('#settingsSync > summary').click();await page.locator('#connectDeviceBtn').click();await page.waitForFunction(()=>document.querySelector('#assistantSource').textContent.includes('Updated'));
  await page.locator('#setClose').click();await page.evaluate(()=>window.__authError=true);await page.locator('#refresh').click();
  await page.locator('#banner').filter({hasText:'Connect this device'}).waitFor();
  if(await page.locator('#lock').isVisible())throw Error('Packaged auth failure exposed the web PIN form');

@@ -15,7 +15,7 @@ All data access uses the authorized local snapshot plus non-conflicting pending 
 | expense.delete | Delete a precisely identified expense | assistantNavigate(history) → existing UI | No action payload; {} only | write (guided) / existing-workflow | Yes, with downloaded ledger and applicable capabilities |
 | income.update | Edit income | assistantNavigate(history) → existing UI | No action payload; {} only | write (guided) / existing-workflow | Yes, with downloaded ledger and applicable capabilities |
 | income.delete | Delete income | assistantNavigate(history) → existing UI | No action payload; {} only | write (guided) / existing-workflow | Yes, with downloaded ledger and applicable capabilities |
-| ledger.search | Search record history | assistantNavigate(history) → existing UI | No action payload; {} only | read (guided) / existing-workflow | Yes, with downloaded ledger and applicable capabilities |
+| ledger.search | Search record history | assistantNavigate(records) → existing UI | No action payload; {} only | read (guided) / existing-workflow | Yes, with downloaded ledger and applicable capabilities |
 | ledger.summary | Overview | assistantNavigate(home) → existing UI | No action payload; {} only | read (guided) / existing-workflow | Yes, with downloaded ledger and applicable capabilities |
 | category.create | Create a spending category | assistantNavigate(newcategory) → existing UI | No action payload; {} only | write (guided) / existing-workflow | Yes, with downloaded ledger and applicable capabilities |
 | category.rename | Rename a category | assistantNavigate(plan) → existing UI | No action payload; {} only | write (guided) / existing-workflow | Yes, with downloaded ledger and applicable capabilities |
@@ -72,3 +72,5 @@ Direct in-chat loan payments, complex edits/deletes, plans, categories and setti
 The assistant also supplies an optional full-view comparison token to the shared atomic enqueue. If another tab changes the stored snapshot or pending queue after preview, that transaction aborts before writing; identical mutation-ID retries remain idempotent. This guard is additional to existing financial revision/dependency checks, not a new financial planner.
 
 Updated standalone recording and deployment instructions: [optional planning](optional-planning.md). This supersedes the first slice’s required category/period defaults.
+
+Records now has a read-only calendar: select a ledger date, then tap an income/expense/fund/loan-payment row to open the existing editor and explicit review workflow. Mirrored loan expenses appear only through the payment. The original searchable history remains available under Add.

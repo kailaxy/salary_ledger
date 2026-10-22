@@ -11,7 +11,7 @@ register('fund.withdraw','Withdraw from a fund','funds','entry','Withdraw 100 fr
 [
  ['expense.update','Edit an expense','history','Change my last expense'],['expense.delete','Delete a precisely identified expense','history','Delete my last expense'],
  ['income.update','Edit income','history','Edit income'],['income.delete','Delete income','history','Delete income'],
- ['ledger.search','Search record history','history','Show my transaction history'],['ledger.summary','Overview','home','Open home'],
+ ['ledger.search','Search record history','records','Show my transaction history'],['ledger.summary','Overview','home','Open home'],
  ['category.create','Create a spending category','newcategory','Create a category'],['category.rename','Rename a category','plan','Rename my Transport category'],
  ['category.archive','Archive a category','plan','Archive a category'],['category.restore','Restore an archived category','plan','Restore a category'],['category.delete','Delete an unused category','plan','Delete an unused category'],
  ['budget.view','Review plans','plan','Open my budgets'],['budget.set','Change a plan allocation','plan','Edit my food budget'],['budget.compare','Compare plans and actuals','plan','Take me to budget planning'],

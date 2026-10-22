@@ -1,0 +1,15 @@
+# Records calendar and Settings sections
+
+Open **Records** in the bottom navigation. The calendar uses the stored transaction date in the ledger, not the creation timestamp or the phone's UTC date. Dots mark days containing records. Use month arrows, Today, Go to date, or arrow keys on the selected day. Selecting a date shows all of that day's live income, expenses, fund movements and loan payments, including non-conflicting pending local changes. Empty days show an explicit empty state. Pending/conflict labels stay separate from financial values. A counted loan payment appears once, with its mirror handled through the existing payment editor.
+
+Tap a record row to open the existing Add editor with its actual values. Optional category/plan choices belong there, not on the assistant preview. Review changes and explicitly confirm to save, or cancel without changing records. Existing fingerprint checks, conflict handling, fund balances, loan mirrors and the durable outbox remain authoritative. The calendar does not write records or introduce any new RPC. After editing, Records keeps the selected date/month for continued browsing; date changes move the record to its new date. The original searchable history under Add is retained.
+
+Opening an already categorized record now rebuilds its matching-plan options after loading the record's category, so a plan can be assigned directly without reselecting the category. Existing legacy associations remain available while editing their original category.
+
+Settings uses independently collapsible, initially closed native details/summary sections: Sync & device, App settings, Pay periods, Assistant personality and Help & guide. Existing controls and security workflows remain inside their respective section. Opening Settings focuses Close, not the app-name input. General/period form state and an expanded section survive normal refreshes while the sheet remains open.
+
+Implementation: `web/record-calendar.js` is a pure read-only projection with `tools/embed-calendar.py` keeping it inline for offline startup; Index.html renders the calendar, daily rows and accordions. Ledger/session changes reset date selection. No financial schema, server files, model integration, native bridge or signing changes are involved.
+
+Validation: 273 Node tests pass, including leap years, month offsets, boundaries, invalid dates, tombstones, mirrored-payment deduplication, untrusted notes and pending/conflict labels. Browser tests cover both hosted and mocked packaged adapters: calendar browsing/keyboard navigation, empty days, optional category/plan edits through the existing review workflow, synchronization, 320/393/768 px layouts and independent Settings expansion/collapse. Production Android build/lint/JVM checks are also run. No physical-device verification is claimed.
+
+Install the next regular Salary Ledger APK. For hosted use, replace Index.html and redeploy the existing web app. No additional Apps Script server-file or spreadsheet changes are required for this increment.
