@@ -363,7 +363,7 @@ function getLedgerSnapshot(pin) {
     const operationIssue = syncIssue || (typeof LedgerOperations === 'undefined' ? 'The deployed Apps Script cannot load Operations.gs.' : typeof loanSyncRow_ !== 'function' ? 'The deployed Apps Script is missing the current LoanSync.gs.' : typeof operationSyncVersion_ !== 'function' ? 'The deployed Apps Script is missing OperationSync.gs.' : '');
     return {
       syncDiagnostics: { operationIssue: operationIssue },
-      capabilities: {recordSyncVersion: syncVersion, fundSyncVersion: syncVersion && typeof fundSyncVersion_ === 'function' ? fundSyncVersion_() : 0, loanSyncVersion: syncVersion && typeof loanSyncVersion_ === 'function' ? loanSyncVersion_() : 0, operationSyncVersion: syncVersion && typeof operationSyncVersion_ === 'function' ? operationSyncVersion_() : 0},
+      capabilities: {optionalPlanningVersion:typeof optionalRecordingVersion_==='function'&&typeof optionalLoanRecordingVersion_==='function'&&typeof LedgerOperations!=='undefined'&&LedgerOperations.optionalPlanningVersion===1?1:0,recordSyncVersion: syncVersion, fundSyncVersion: syncVersion && typeof fundSyncVersion_ === 'function' ? fundSyncVersion_() : 0, loanSyncVersion: syncVersion && typeof loanSyncVersion_ === 'function' ? loanSyncVersion_() : 0, operationSyncVersion: syncVersion && typeof operationSyncVersion_ === 'function' ? operationSyncVersion_() : 0},
       formatVersion: 1, ledgerId: ss.getId(), capturedAt: now.toISOString(),
       timezone: TZ_, currency: settings.currency || '₱', minorUnitScale: 2,
       tables: tables, state: buildState_(ss, now)
@@ -371,6 +371,7 @@ function getLedgerSnapshot(pin) {
   });
 }
 
+function reportingPeriod_(periods,r,date){if(r.period_id)return r.period_id;let found='';periods.slice().sort((a,b)=>a.pay_date.localeCompare(b.pay_date)).forEach(p=>{if(p.pay_date<=date)found=p.period_id;});return found;}
 function buildState_(ss, now) {
   const today = todayIso_(now);
   const set = getSettings_(ss);
@@ -395,10 +396,11 @@ function buildState_(ss, now) {
     const m = (byCat[t.period_id] = byCat[t.period_id] || {});
     const sign = t.type === 'FUND_OUT' ? -1 : 1;
     m[t.category_id] = r2_((m[t.category_id] || 0) + sign * t.amount);
-    if (t.type === 'EXPENSE') spentBy[t.period_id] = (spentBy[t.period_id] || 0) + t.amount;
-    else fundBy[t.period_id] = (fundBy[t.period_id] || 0) + sign * t.amount;
+    const report=reportingPeriod_(periodsRaw,t,t.txn_date);
+    if (t.type === 'EXPENSE') spentBy[report] = (spentBy[report] || 0) + t.amount;
+    else fundBy[report] = (fundBy[report] || 0) + sign * t.amount;
   });
-  income.forEach(i => { incomeBy[i.period_id] = (incomeBy[i.period_id] || 0) + i.amount; hasInc[i.period_id] = true; });
+  income.forEach(i => {const report=reportingPeriod_(periodsRaw,i,i.received_date);incomeBy[report]=(incomeBy[report]||0)+i.amount;hasInc[report]=true;});
 
   let current = null;
   periodsRaw.forEach(p => { if (p.pay_date <= today) current = p.period_id; });
@@ -449,7 +451,7 @@ function buildState_(ss, now) {
   txns.forEach(t => {
     if (mirrored[t.txn_id]) return;
     const c = catById[t.category_id];
-    recent.push({ kind: 'txn', id: t.txn_id, date: t.txn_date, at: t.created_at, title: c ? c.name : '(deleted category)', amount: t.amount,
+    recent.push({ kind: 'txn', id: t.txn_id, date: t.txn_date, at: t.created_at, title: c ? c.name : (t.category_id?'(deleted category)':'Uncategorized'), amount: t.amount,
       dir: t.type === 'FUND_OUT' ? 'in' : 'out',
       sub: [t.type === 'EXPENSE' ? 'Expense' : t.type === 'FUND_IN' ? 'Fund deposit' : 'Fund withdrawal',
         perById[t.period_id] ? 'for ' + perById[t.period_id].label : '', t.note].filter(Boolean).join(' · ') });
@@ -513,7 +515,7 @@ function fundBalance_(ss, categoryId) {
 
 function addIncome(pin, rec) {
   return mutate_(pin, rec, function (ss, r) {
-    const per = findPeriod_(ss, r.periodId);
+    const per = r.periodId?findPeriod_(ss, r.periodId):{period_id:''};
     const kind = String(r.kind || 'SALARY');
     if (ENUMS.INCOME.kind.indexOf(kind) < 0) fail_('Pick an income type.');
     appendRows_(ss, 'INCOME', [{
@@ -527,8 +529,8 @@ function addTransaction(pin, rec) {
   return mutate_(pin, rec, function (ss, r) {
     const type = String(r.type || '');
     if (ENUMS.TRANSACTIONS.type.indexOf(type) < 0) fail_('Pick a record type.');
-    const per = findPeriod_(ss, r.periodId);
-    const cat = findCategory_(ss, r.categoryId, type === 'EXPENSE' ? 'SPENDING' : 'FUND');
+    const per = r.periodId?findPeriod_(ss, r.periodId):{period_id:''};
+    const cat = !r.categoryId&&type==='EXPENSE'?{category_id:''}:findCategory_(ss, r.categoryId, type === 'EXPENSE' ? 'SPENDING' : 'FUND');
     const amount = money_(r.amount, 'an amount');
     if (type === 'FUND_OUT' && amount > fundBalance_(ss, cat.category_id) + 0.005) fail_('"' + cat.name + '" only holds ₱' + fundBalance_(ss, cat.category_id).toFixed(2) + '.');
     appendRows_(ss, 'TRANSACTIONS', [{
@@ -646,7 +648,7 @@ function addLoanPayment(pin, rec) {
     const date = dateIn_(r.date, 'date');
     let txnId = '';
     if (r.alsoSpend === true) {
-      const per = findPeriod_(ss, r.periodId), cat = findCategory_(ss, r.categoryId, 'SPENDING');
+      const per=r.periodId?findPeriod_(ss,r.periodId):{period_id:''},cat=r.categoryId?findCategory_(ss,r.categoryId,'SPENDING'):{category_id:''};
       txnId = newId_('txn', allIds_(ss, 'TRANSACTIONS'));
       appendRows_(ss, 'TRANSACTIONS', [{ txn_id: txnId, period_id: per.period_id, category_id: cat.category_id, type: 'EXPENSE',
         txn_date: date, amount: amount, note: text_(r.note, 200, false, 'Note') || ('Loan: ' + loan.name) }]);

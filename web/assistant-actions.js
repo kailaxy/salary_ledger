@@ -2,12 +2,12 @@
 (function(root){
 'use strict';
 var entries=[];
-function register(id,title,screen,handler,example,required){entries.push({id:id,title:title,screen:screen,handler:handler,example:example,mode:handler==='entry'?'write':handler==='query'?'read':'guided',access:handler==='entry'||/\.(create|update|delete|rename|archive|restore|set|update_goal|record_payment|payment_update|payment_delete|generate|edit)$/.test(id)?'write':'read',required:required||[],optional:handler==='entry'?(id==='income.create'?['note','source']:['note']):[],confirmation:handler==='entry'?'explicit-button':handler==='query'?'none':'existing-workflow',offline:screen!=='sync',authorization:'Authorized ledger; writes require unlock and existing sync capability',parameters:handler==='entry'?(id==='income.create'?['amountMinor','kind','date','periodId','note','source']:['amountMinor','categoryId','date','periodId','note']):[]});}
+function register(id,title,screen,handler,example,required){entries.push({id:id,title:title,screen:screen,handler:handler,example:example,mode:handler==='entry'?'write':handler==='query'?'read':'guided',access:handler==='entry'||/\.(create|update|delete|rename|archive|restore|set|update_goal|record_payment|payment_update|payment_delete|generate|edit)$/.test(id)?'write':'read',required:required||[],optional:handler==='entry'?(id==='income.create'?['periodId','note','source']:id==='expense.create'?['categoryId','periodId','note']:['periodId','note']):[],confirmation:handler==='entry'?'explicit-button':handler==='query'?'none':'existing-workflow',offline:screen!=='sync',authorization:'Authorized ledger; writes require unlock and existing sync capability',parameters:handler==='entry'?(id==='income.create'?['amountMinor','kind','date','periodId','note','source']:['amountMinor','categoryId','date','periodId','note']):[]});}
 register('ledger.query','Ask about saved finances','home','query','How much did I spend this month?');
-register('expense.create','Record an expense','add','entry','Add 250 pesos for lunch today',['amountMinor','categoryId','date','periodId']);
-register('income.create','Record income','add','entry','Add salary income of 15000 today',['amountMinor','kind','date','periodId']);
-register('fund.deposit','Deposit to a fund','funds','entry','Deposit 1000 into Emergency Fund today',['amountMinor','categoryId','date','periodId']);
-register('fund.withdraw','Withdraw from a fund','funds','entry','Withdraw 100 from Emergency Fund today',['amountMinor','categoryId','date','periodId']);
+register('expense.create','Record an expense','add','entry','Add 250 pesos for lunch today',['amountMinor','date']);
+register('income.create','Record income','add','entry','Add salary income of 15000 today',['amountMinor','kind','date']);
+register('fund.deposit','Deposit to a fund','funds','entry','Deposit 1000 into Emergency Fund today',['amountMinor','categoryId','date']);
+register('fund.withdraw','Withdraw from a fund','funds','entry','Withdraw 100 from Emergency Fund today',['amountMinor','categoryId','date']);
 [
  ['expense.update','Edit an expense','history','Change my last expense'],['expense.delete','Delete a precisely identified expense','history','Delete my last expense'],
  ['income.update','Edit income','history','Edit income'],['income.delete','Delete income','history','Delete income'],
@@ -25,22 +25,24 @@ register('fund.withdraw','Withdraw from a fund','funds','entry','Withdraw 100 fr
 function get(id){var found=entries.find(function(e){return e.id===id;});if(!found)throw Error('Unknown assistant capability.');return JSON.parse(JSON.stringify(found));}
 function validate(id,p){var c=get(id);if(!p||typeof p!=='object'||Array.isArray(p)||Object.keys(p).some(function(k){return ['__proto__','constructor','prototype'].indexOf(k)>=0;}))throw Error('Invalid action parameters.');Object.keys(p).forEach(function(k){if(c.parameters.indexOf(k)<0)throw Error('Unexpected parameter: '+k);});if(c.handler!=='entry')return p;
  if(p.amountMinor!==undefined&&(!Number.isSafeInteger(p.amountMinor)||p.amountMinor<=0))throw Error('Enter a positive amount with at most two decimal places.');
- ['categoryId','periodId'].forEach(function(k){if(p[k]!==undefined&&(typeof p[k]!=='string'||!p[k]||p[k].length>150))throw Error('Choose an existing '+k+'.');});
+ ['categoryId','periodId'].forEach(function(k){if(p[k]!==undefined&&(typeof p[k]!=='string'||p[k].length>150))throw Error('Choose an existing '+k+'.');});
  if(p.kind!==undefined&&['SALARY','BONUS','OTHER'].indexOf(p.kind)<0)throw Error('Choose salary, bonus or other income.');
  if(p.date!==undefined&&(!/^\d{4}-\d{2}-\d{2}$/.test(p.date)||!Number.isFinite(Date.parse(p.date+'T00:00:00Z'))||new Date(p.date+'T00:00:00Z').toISOString().slice(0,10)!==p.date))throw Error('Choose a valid date.');
  ['note','source'].forEach(function(k){if(p[k]!==undefined&&(typeof p[k]!=='string'||p[k].length>(k==='note'?200:60)||/[\x00-\x1f]/.test(p[k])))throw Error('Invalid '+k+'.');});return p;
 }
 function normalize(s){return String(s).normalize('NFKC').toLowerCase().replace(/[’]/g,"'").replace(/\s+/g,' ').trim().replace(/[?.!]$/,'');}
 function rows(snapshot,table){return snapshot&&snapshot.tables&&snapshot.tables[table]?snapshot.tables[table].map(function(x){return x.record;}).filter(function(r){return !r.deleted_at;}):[];}
-function choices(id,field,snapshot){
- if(field==='categoryId')return rows(snapshot,'CATEGORIES').filter(function(c){return !c.is_archived&&c.kind===(id.indexOf('fund.')===0?'FUND':'SPENDING');}).map(function(c){return {value:c.category_id,label:c.name};});
- if(field==='periodId')return rows(snapshot,'PAY_PERIODS').map(function(p){return {value:p.period_id,label:p.label+' · '+p.pay_date};});
+function choices(id,field,snapshot,params){
+ var optional=snapshot&&snapshot.capabilities&&snapshot.capabilities.optionalPlanningVersion===1;
+ if(field==='categoryId')return (optional&&id==='expense.create'?[{value:'',label:'Uncategorized'}]:[]).concat(rows(snapshot,'CATEGORIES').filter(function(c){return !c.is_archived&&c.kind===(id.indexOf('fund.')===0?'FUND':'SPENDING');}).map(function(c){return {value:c.category_id,label:c.name};}));
+ if(field==='periodId')return (optional?[{value:'',label:id==='expense.create'?'No plan linked':'Automatic reporting by date'}]:[]).concat(rows(snapshot,'PAY_PERIODS').filter(function(p){return !optional||id!=='expense.create'||rows(snapshot,'BUDGET_LINES').some(function(b){return b.period_id===p.period_id&&b.category_id===(params&&params.categoryId);});}).map(function(p){return {value:p.period_id,label:p.label+' · '+p.pay_date};}));
  if(field==='kind')return [{value:'SALARY',label:'Salary'},{value:'BONUS',label:'Bonus'},{value:'OTHER',label:'Other'}];return [];
 }
-function resolve(id,p,snapshot){validate(id,p);p=Object.assign({},p);['categoryId','periodId','kind'].forEach(function(k){if(p[k]!==undefined&&!choices(id,k,snapshot).some(function(c){return c.value===p[k];}))throw Error('That selection is no longer available.');});return {params:p,missing:get(id).required.filter(function(k){return p[k]===undefined;})};}
+function resolve(id,p,snapshot){validate(id,p);p=Object.assign({},p);var optional=snapshot&&snapshot.capabilities&&snapshot.capabilities.optionalPlanningVersion===1;if(optional){if(p.periodId===undefined)p.periodId='';if(id==='expense.create'&&p.categoryId===undefined)p.categoryId='';}
+ ['categoryId','periodId','kind'].forEach(function(k){if(p[k]!==undefined&&p[k]!==''&&!choices(id,k,snapshot,p).some(function(c){return c.value===p[k];}))throw Error('That selection is no longer available.');});var required=get(id).required.slice();if(!optional){if(id==='expense.create')required.splice(1,0,'categoryId');required.push('periodId');}return {params:p,missing:required.filter(function(k){return p[k]===undefined;})};}
 var forbidden=/\b(don't|dont|do not|not|without|except|excluding|all|every|bulk|two|both|unless|huwag|wag|lahat|maliban|pero|but)\b/;
 function interpret(text,snapshot,now){
- var s=normalize(text);if(!s||s.length>600)return {type:'unsupported',message:'Try one short question or action at a time.'};
+ var s=normalize(text);if(/^\d+(?:\.\d{1,2})?\s+[a-z]/.test(s))s='add '+s;if(!s||s.length>600)return {type:'unsupported',message:'Try one short question or action at a time.'};
  if(/^(what can you do|help|show available commands|paano kita gamitin|available commands)$/.test(s))return {type:'help'};
  var help=s.match(/^(?:help me manage|what can i ask about) (?:my )?(loans|expenses|funds|budgets|income)$/);if(help)return {type:'help',group:help[1]};
  s=s.replace(/^(?:please|can you|could you|paki)\s+/,'');
@@ -57,7 +59,9 @@ function interpret(text,snapshot,now){
  var rest=s.slice(action[0].length).trim(),p={},note=rest.match(/\bnote\s+(.+)$/);if(note){p.note=note[1];rest=rest.slice(0,note.index).trim();}
  var date=rest.match(/\b\d{4}-\d{2}-\d{2}\b/);if(date){p.date=date[0];rest=rest.replace(date[0],' ');}
  if(/\btoday\b/.test(rest)){if(p.date)return {type:'unsupported',message:'Use one date per action.'};p.date=root.LedgerQuery.bounds('today',snapshot.timezone,now)[0];rest=rest.replace(/\btoday\b/,' ');}
- var amount=rest.match(/(?:₱\s*)?(?:\d[\d,.]*)/);if(amount){var a=amount[0].replace(/₱|\s/g,'');if(!/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$/.test(a))return {type:'unsupported',message:'Use a positive peso amount with at most two decimal places.'};p.amountMinor=root.LedgerQuery.cents(a.replace(/,/g,''));rest=rest.replace(amount[0],' ');}
+ if(/[$€£¥]|\b(usd|dollars?|eur|euros?|yen)\b/.test(rest))return {type:'unsupported',message:'Use a peso amount; currency conversion is not supported.'};
+ if(/[+-]\s*(?:₱\s*)?\d/.test(rest))return {type:'unsupported',message:'Use a positive amount without a sign.'};
+ var amount=rest.match(/(?:₱\s*)?(?:\d[\d,.]*)/);if(amount){if(amount.index+amount[0].length<rest.length&&!/\s/.test(rest[amount.index+amount[0].length]))return {type:'unsupported',message:'Separate the peso amount from the description; shorthand amounts are not supported.'};var a=amount[0].replace(/₱|\s/g,'');if(!/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$/.test(a))return {type:'unsupported',message:'Use a positive peso amount with at most two decimal places.'};p.amountMinor=root.LedgerQuery.cents(a.replace(/,/g,''));rest=rest.replace(amount[0],' ');}
  if(id==='income.create'){var kind=rest.match(/\b(salary|bonus|other)\b/);if(kind){p.kind=kind[0].toUpperCase();rest=rest.replace(kind[0],' ');}}
  var alias={pagkain:'food',pamasahe:'transport',transportation:'transport'};
  var possible=choices(id,'categoryId',snapshot),matches=[];
@@ -67,7 +71,9 @@ function interpret(text,snapshot,now){
  var lunch=rest.match(/\b(?:for\s+)?lunch\b/);if(lunch){if(!p.note)p.note='Lunch';rest=rest.replace(lunch[0],' ');}
  if(id.indexOf('fund.')===0)rest=rest.replace(/\b(savings|fund)\b/g,' ');
  rest=rest.replace(/\b(pesos?|expense|gastos|income|ng|na|sa|of|for|into|from|in|on|to|an|a)\b/g,' ').replace(/₱/g,' ').trim();
+ if(rest&&id==='expense.create'&&snapshot.capabilities&&snapshot.capabilities.optionalPlanningVersion===1&&!/\b(tomorrow|yesterday|weekly|daily|monthly|before|after|until|instead|split|recurring|each|per|tom|bukas|kahapon)\b/.test(rest)&&!/[\d]/.test(rest)&&!p.note){p.note=rest;rest='';}
  if(rest)return {type:'unsupported',message:'I could not safely resolve “'+rest+'”. Choose the exact category or use the existing entry workflow.',screen:'add'};
+ if(snapshot.capabilities&&snapshot.capabilities.optionalPlanningVersion===1&&!p.date)p.date=root.LedgerQuery.bounds('today',snapshot.timezone,now)[0];
  try{validate(id,p);return {type:'draft',id:id,params:p};}catch(e){return {type:'unsupported',message:e.message,screen:'add'};}
 }
 root.AssistantActions={list:function(){return JSON.parse(JSON.stringify(entries));},get:get,validate:validate,resolve:resolve,choices:choices,interpret:interpret,normalize:normalize};

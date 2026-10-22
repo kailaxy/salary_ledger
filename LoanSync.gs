@@ -66,7 +66,7 @@ function loanSyncRecoverEntry_(ss, journal, entry) {
     if (!partial) return syncFinish_(journal,entry.number,'CONFLICT',loanSyncConflict_(request,context));
     throw new Error('SYNC_LOAN_RECOVERY_REQUIRED: A partially saved payment was changed directly in Sheets. Preserve the journal and restore its prepared values before retrying.');
   }
-  if (bundle.expense && !currents[0]) { findPeriod_(ss,bundle.expense.period_id); findCategory_(ss,bundle.expense.category_id,'SPENDING'); }
+  if (bundle.expense && !currents[0]) { if(bundle.expense.period_id)findPeriod_(ss,bundle.expense.period_id); if(bundle.expense.category_id)findCategory_(ss,bundle.expense.category_id,'SPENDING'); }
   targets.forEach((t,i)=>{if (!currents[i]) loanSyncWrite_(ss,t.table,t.record);});
   if (context.fingerprint !== syncHash_('LOANS',bundle.loan)) loanSyncWrite_(ss,'LOANS',bundle.loan);
   // Verify all effects, including status, before issuing a durable acknowledgement.
@@ -104,7 +104,7 @@ function syncLoanPayment(pin,input) {
     if (v.amountMinor > Math.round(context.loan.total_payable*100)-context.paidMinor) return loanSyncConflict_(request,context);
     const txnId=v.alsoSpend ? 'txn_'+request.recordId.slice(4) : '';
     if (loanSyncRow_(ss,'LOAN_PAYMENTS',request.recordId) || (txnId && loanSyncRow_(ss,'TRANSACTIONS',txnId))) return loanSyncConflict_(request,context);
-    if (v.alsoSpend) { findPeriod_(ss,v.periodId);findCategory_(ss,v.categoryId,'SPENDING'); }
+    if (v.alsoSpend) { if(v.periodId)findPeriod_(ss,v.periodId);if(v.categoryId)findCategory_(ss,v.categoryId,'SPENDING'); }
     const stamp=stamp_(), note=syncText_(v.note,200,false,'Note');
     const payment=syncCleanRecord_('LOAN_PAYMENTS',{payment_id:request.recordId,loan_id:v.loanId,installment_id:context.metrics.next ? context.metrics.next.id : '',txn_id:txnId,paid_date:v.date,amount:v.amountMinor/100,note:note,created_at:stamp,updated_at:stamp,deleted_at:''});
     const expense=v.alsoSpend ? syncCleanRecord_('TRANSACTIONS',{txn_id:txnId,period_id:v.periodId,category_id:v.categoryId,type:'EXPENSE',txn_date:v.date,amount:v.amountMinor/100,note:note || ('Loan: '+context.loan.name),created_at:stamp,updated_at:stamp,deleted_at:''}) : null;
@@ -115,3 +115,5 @@ function syncLoanPayment(pin,input) {
     return loanSyncRecoverEntry_(ss,journal,{row:row,number:number});
   });
 }
+
+function optionalLoanRecordingVersion_(){return 1;}

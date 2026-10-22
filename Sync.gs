@@ -1,5 +1,5 @@
 /** Reliable single-record sync, v1. Add this file beside Code.gs.
- * Supports INCOME, unlinked EXPENSE and add-only fund transfers. Existing online RPCs are unchanged.
+ * Supports INCOME, ordinary EXPENSE with optional plan/category references and add-only fund transfers. Existing online RPCs are unchanged.
  * SYNC_JOURNAL is durable and must not be deleted while clients can retry requests.
  */
 const SYNC_HEADERS = ['request_id', 'request_json', 'status', 'table_name', 'record_id', 'before_json', 'after_json', 'receipt_json', 'created_at'];
@@ -67,7 +67,7 @@ function syncValidate_(request) {
     if (typeof values.date !== 'string') fail_('Invalid date.');
     dateIn_(values.date, 'date');
   }
-  ['periodId', 'categoryId'].forEach(k => { if (values[k] !== undefined && (typeof values[k] !== 'string' || !values[k] || values[k].length > 80)) fail_('Invalid ' + k + '.'); });
+  ['periodId', 'categoryId'].forEach(k => { if (values[k] !== undefined && (typeof values[k] !== 'string' || values[k].length > 80)) fail_('Invalid ' + k + '.'); });
   if (values.type !== undefined && (request.table !== 'TRANSACTIONS' || ['EXPENSE','FUND_IN','FUND_OUT'].indexOf(values.type) < 0 || request.operation !== 'add')) fail_('Invalid transfer type.');
   if (values.kind !== undefined && ENUMS.INCOME.kind.indexOf(values.kind) < 0) fail_('Invalid income kind.');
   if (values.note !== undefined) syncText_(values.note, 200, false, 'Note');
@@ -90,8 +90,8 @@ function syncAfter_(ss, request, before) {
   });
   if (v.amountMinor !== undefined) result.amount = v.amountMinor / 100;
   result.updated_at = stamp_();
-  findPeriod_(ss, result.period_id);
-  if (!income) findCategory_(ss, result.category_id, result.type === 'EXPENSE' ? 'SPENDING' : 'FUND');
+  if(result.period_id)findPeriod_(ss, result.period_id);
+  if (!income && (result.category_id || result.type !== 'EXPENSE')) findCategory_(ss, result.category_id, result.type === 'EXPENSE' ? 'SPENDING' : 'FUND');
   return result;
 }
 function syncCurrent_(ss, table, id) {
@@ -153,8 +153,8 @@ function syncLedgerMutation(pin, input) {
         return syncFinish_(journal,entry.number,'CONFLICT',{status:'conflict',mutationId:request.mutationId,recordId:request.recordId,remote:current ? syncCleanRecord_(request.table,current) : null,fingerprint:current ? syncHash_(request.table,current) : null});
       }
       // Recheck relationships after a crash before replaying the prepared write.
-      findPeriod_(ss, after.period_id);
-      if (request.table === 'TRANSACTIONS') findCategory_(ss,after.category_id,after.type === 'EXPENSE' ? 'SPENDING' : 'FUND');
+      if(after.period_id)findPeriod_(ss, after.period_id);
+      if (request.table === 'TRANSACTIONS' && (after.category_id || after.type !== 'EXPENSE')) findCategory_(ss,after.category_id,after.type === 'EXPENSE' ? 'SPENDING' : 'FUND');
       if (current) {
         const cols = colsOf_(request.table);
         ss.getSheetByName(request.table).getRange(current._row,1,1,cols.length).setNumberFormats([cols.map(colFmt_)]).setValues([cols.map(c => after[c])]);
@@ -172,3 +172,6 @@ function syncLedgerMutation(pin, input) {
 
 /** Capability marker for add-only offline fund transfers. */
 function fundSyncVersion_() { return 1; }
+
+// Advertise standalone recording only when this updated validator is installed.
+function optionalRecordingVersion_(){return 1;}

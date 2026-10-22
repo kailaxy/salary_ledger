@@ -1,0 +1,41 @@
+const {waitFor}=require('./wait.cjs');
+const {chromium}=require('playwright-core'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const {fixture}=require('../helpers/operations-server.cjs');
+async function queue(page,count){await waitFor(page,async n=>(await LedgerLocal.list('test-ledger')).length===n,count);await page.waitForFunction(()=>document.querySelector('#addGo')?.disabled===false||!document.querySelector('#addGo')||!document.querySelector('#addNeed').hidden);await page.evaluate(()=>new Promise(requestAnimationFrame));}
+async function confirm(page){await page.locator('#reviewConfirm').click();}
+(async()=>{for(const native of [false,true]){
+ const server=fixture();server.put('PAY_PERIODS',{period_id:'per_future',label:'Nov 15',pay_date:'2026-11-15'});
+ server.put('BUDGET_LINES',{line_id:'line_food',period_id:'per_test',category_id:'cat_food',planned_amount:1000});
+ const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||(fs.existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/usr/bin/google-chrome'),args:['--no-sandbox']});
+ let page;try{
+ page=await browser.newPage({viewport:{width:393,height:852}});page.setDefaultTimeout(10000);const errors=[];page.on('pageerror',e=>errors.push(e.message));let lost=false;
+ await page.exposeFunction('testRPC',async(method,args)=>{if(native)args=['123456',...args];if(!['getLedgerSnapshot','syncOperation','syncLedgerMutation','syncLoanPayment'].includes(method))throw Error('Unexpected method '+method);const r=server.ctx[method](...args);if(method==='syncOperation'&&lost){lost=false;throw Error('Simulated lost operation reply');}return JSON.parse(JSON.stringify(r));});
+ await page.addInitScript(({native})=>{
+  if(!native)localStorage.setItem('sl2_pin','123456');Object.defineProperty(navigator,'onLine',{get:()=>sessionStorage.getItem('offline')!=='1'});
+  if(native){window.LedgerAndroid={onmessage:null,postMessage(text){const r=JSON.parse(text);if(!navigator.onLine){setTimeout(()=>LedgerAndroid.onmessage({data:JSON.stringify({id:r.id,ok:false,error:'offline'})}),1);return;}window.testRPC(r.method,r.args).then(result=>LedgerAndroid.onmessage({data:JSON.stringify({id:r.id,ok:true,result})}),e=>LedgerAndroid.onmessage({data:JSON.stringify({id:r.id,ok:false,error:e.message})}));}};return;}
+  window.google={script:{}};Object.defineProperty(google.script,'run',{get(){let success,failure;const runner=new Proxy({withSuccessHandler(f){success=f;return runner},withFailureHandler(f){failure=f;return runner}},{get(t,k){return k in t?t[k]:(...a)=>{if(!navigator.onLine){failure(Error('offline'));return;}testRPC(k,a).then(success,failure)};}});return runner;}});
+ },{native});
+ const url=native?'https://appassets.androidplatform.net/assets/Index.html':'https://ledger.test/';let html=fs.readFileSync(path.join(__dirname,'../../Index.html'),'utf8');if(native)html=html.replace(/^<link[^>]*https:\/\/fonts\.(googleapis|gstatic)\.com[^>]*>\r?\n/gm,'').replace(/^<base[^>]*>\r?\n/gm,'');
+ await page.route(url,r=>r.fulfill({contentType:'text/html',headers:native?{'Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"}:{},body:html}));await page.route(/fonts\.(googleapis|gstatic)\.com/,r=>r.abort());await page.goto(url);await page.waitForFunction(()=>document.querySelector('#assistantSource').textContent.includes('Updated'));
+ await page.evaluate(()=>{sessionStorage.setItem('offline','1');dispatchEvent(new Event('offline'));});
+
+ async function ask(text){await page.locator('#assistantInput').fill(text);await page.locator('#assistantInput').press('Enter');return page.locator('.assistant-answer').last();}
+ const answer=()=>page.locator('.assistant-answer').last();
+ async function save(){await answer().getByRole('button',{name:'Confirm and save',exact:true}).click();await page.waitForFunction(()=>Array.from(document.querySelectorAll('.assistant-save-status')).at(-1)?.textContent.includes('Saved on this device'));}
+ await ask('Add 80 fare');assert.match(await answer().innerText(),/fare/i);assert.equal(await answer().getByRole('button',{name:'Oct · 2026-10-15',exact:true}).count(),0);await save();await queue(page,1);
+ let rows=await page.evaluate(async()=>await LedgerLocal.list('test-ledger'));assert.equal(rows[0].payload.values.periodId,'');assert.equal(rows[0].payload.values.categoryId,'');
+ await ask('Add 160 food today');await save();await queue(page,2);
+ let budget=await page.evaluate(async()=>{const v=await LedgerLocal.view();return LedgerQuery.query(LedgerPending.project(v.snapshot,v.entries),{action:'query',operation:'budgets',kind:'expense',range:'current_period',mode:'remaining',categoryId:'cat_food'}).budgets[0].remainingMinor;});assert.equal(budget,100000);
+ await ask('Add 250 food today');await answer().getByRole('button',{name:'Link to a plan (optional)',exact:true}).click();await answer().getByRole('button',{name:'Oct · 2026-10-15',exact:true}).click();await save();await queue(page,3);
+ budget=await page.evaluate(async()=>{const v=await LedgerLocal.view();return LedgerQuery.query(LedgerPending.project(v.snapshot,v.entries),{action:'query',operation:'budgets',kind:'expense',range:'current_period',mode:'remaining',categoryId:'cat_food'}).budgets[0].remainingMinor;});assert.equal(budget,75000);
+ const linked=await page.evaluate(async()=>(await LedgerLocal.list('test-ledger'))[2].payload.recordId);
+ await page.locator('#tab-add').click();await page.locator('[data-act="del"][data-id="'+linked+'"]').click();await page.locator('[data-act="del"][data-id="'+linked+'"]').click();await confirm(page);await queue(page,4);
+ let view=await page.evaluate(async()=>{const v=await LedgerLocal.view(),s=LedgerPending.project(v.snapshot,v.entries);return {total:s.state.summary.spent,plan:s.state.plan.per_test.cat_food,linked:s.state.byCat.per_test?.cat_food||0};});assert.deepEqual(view,{total:240,plan:1000,linked:0});
+ // Normal Add form can save with no category/period selection as well.
+ await page.locator('#fCat').selectOption('');await page.locator('#fPeriod').selectOption('');await page.locator('#fAmount').fill('90');await page.locator('#fNote').fill('Random expense');await page.locator('#addGo').click();await confirm(page);await queue(page,5);
+ for(const width of [320,393,768]){await page.setViewportSize({width,height:852});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);}
+ await page.evaluate(()=>{sessionStorage.removeItem('offline');dispatchEvent(new Event('online'));});await queue(page,0);
+ assert.equal(server.snapshot().state.summary.spent,330);assert.equal(server.rows('BUDGET_LINES')[0].planned_amount,1000);assert.deepEqual(errors,[]);
+ console.log('PASS ('+(native?'packaged':'hosted')+'): standalone fare/uncategorized recording, optional plan linking, linked-only budget usage, deletion preserves plan, normal Add defaults, real synchronization and mobile layouts');
+ }finally{await browser.close();}
+}})().catch(e=>{console.error(e);process.exit(1);});

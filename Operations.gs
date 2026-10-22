@@ -38,8 +38,8 @@ function plan(snapshot,action,args,mutationId,stamp){
    var rows=s.tables[t],at=rows.findIndex(function(x){return x.record[key]===r[key];});var wrap={record:r,fingerprint:at>=0?rows[at].fingerprint:'0'.repeat(64)};if(at<0)rows.push(wrap);else rows[at]=wrap;return r;
  }
  function remove(t,r){var n=copy(r);n.deleted_at=stamp;set(t,n);}
- function activeCategory(cid,kind,previous){var c=need(s,'CATEGORIES',cid);if((c.is_archived&&cid!==previous)||(kind&&c.kind!==kind))fail('Choose an active matching category.');return c;}
- function period(pid){return need(s,'PAY_PERIODS',pid);}
+ function activeCategory(cid,kind,previous){if(cid===''&&kind==='SPENDING')return null;var c=need(s,'CATEGORIES',cid);if((c.is_archived&&cid!==previous)||(kind&&c.kind!==kind))fail('Choose an active matching category.');return c;}
+ function period(pid,optional){if(pid===''&&optional)return null;return need(s,'PAY_PERIODS',pid);}
  function loanStatus(loanId){var l=copy(need(s,'LOANS',loanId)),paid=live(s,'LOAN_PAYMENTS').filter(function(p){return p.loan_id===loanId;}).reduce(function(n,p){return n+money(p.amount,true);},0);if(paid>money(l.total_payable,true))fail('Payment exceeds the amount still owed.');l.status=paid>=money(l.total_payable,true)?'PAID':'ACTIVE';set('LOANS',l);}
  function unique(t,name,existing){if(live(s,t).some(function(r){return r.name.toLowerCase()===name.toLowerCase()&&r[pk(t)]!==existing;}))fail('That name is already used.');}
  function checkFunds(){live(s,'CATEGORIES').filter(function(c){return c.kind==='FUND';}).forEach(function(c){var balance=fundBalance(s,c.category_id);if(balance<0)fail('This change would overdraw '+c.name+'.');if(c.is_archived&&balance!==0)fail('Withdraw the balance before archiving a fund.');});}
@@ -65,8 +65,8 @@ function plan(snapshot,action,args,mutationId,stamp){
   if(kind==='income')remove('INCOME',need(s,'INCOME',recordId));else{var payment=live(s,'LOAN_PAYMENTS').find(function(p){return kind==='loanpay'?p.payment_id===recordId:p.txn_id===recordId;}),txn=kind==='txn'?need(s,'TRANSACTIONS',recordId):payment&&payment.txn_id?need(s,'TRANSACTIONS',payment.txn_id):null;if(!payment&&!txn)fail('Record no longer exists.');if(txn)remove('TRANSACTIONS',txn);if(payment){remove('LOAN_PAYMENTS',payment);loanStatus(payment.loan_id);}checkFunds();}title='Delete '+kind+' record and any linked spending';
  }else if(action==='editRecord'){
   if(args.length!==1)fail('Invalid arguments.');fields(r,['table','id','date','amount','note','periodId','categoryId','alsoSpend']);if(['TRANSACTIONS','LOAN_PAYMENTS'].indexOf(r.table)<0)fail('Unsupported edit.');var current=copy(need(s,r.table,r.id)),amount=money(r.amount,false)/100,when=date(r.date),note=text(r.note,200,false);
-  if(r.table==='TRANSACTIONS'){if(live(s,'LOAN_PAYMENTS').some(function(p){return p.txn_id===r.id;}))fail('Edit the linked loan payment instead.');period(r.periodId);activeCategory(r.categoryId,current.type==='EXPENSE'?'SPENDING':'FUND',current.category_id);current.period_id=r.periodId;current.category_id=r.categoryId;current.txn_date=when;current.amount=amount;current.note=note;set('TRANSACTIONS',current);checkFunds();}
-  else{if(typeof r.alsoSpend!=='boolean')fail('Choose whether to count spending.');var previous=current.txn_id?need(s,'TRANSACTIONS',current.txn_id):null;current.paid_date=when;current.amount=amount;current.note=note;if(r.alsoSpend){period(r.periodId);activeCategory(r.categoryId,'SPENDING',previous&&previous.category_id);var txn=previous?copy(previous):{txn_id:id('txn'),type:'EXPENSE'};txn.period_id=r.periodId;txn.category_id=r.categoryId;txn.txn_date=when;txn.amount=amount;txn.note=note||'Loan: '+need(s,'LOANS',current.loan_id).name;set('TRANSACTIONS',txn);current.txn_id=txn.txn_id;}else{if(previous)remove('TRANSACTIONS',previous);current.txn_id='';}set('LOAN_PAYMENTS',current);loanStatus(current.loan_id);}title='Edit '+(r.table==='LOAN_PAYMENTS'?'loan payment':'fund or expense entry');
+  if(r.table==='TRANSACTIONS'){if(live(s,'LOAN_PAYMENTS').some(function(p){return p.txn_id===r.id;}))fail('Edit the linked loan payment instead.');period(r.periodId,true);activeCategory(r.categoryId,current.type==='EXPENSE'?'SPENDING':'FUND',current.category_id);current.period_id=r.periodId;current.category_id=r.categoryId;current.txn_date=when;current.amount=amount;current.note=note;set('TRANSACTIONS',current);checkFunds();}
+  else{if(typeof r.alsoSpend!=='boolean')fail('Choose whether to count spending.');var previous=current.txn_id?need(s,'TRANSACTIONS',current.txn_id):null;current.paid_date=when;current.amount=amount;current.note=note;if(r.alsoSpend){period(r.periodId,true);activeCategory(r.categoryId,'SPENDING',previous&&previous.category_id);var txn=previous?copy(previous):{txn_id:id('txn'),type:'EXPENSE'};txn.period_id=r.periodId;txn.category_id=r.categoryId;txn.txn_date=when;txn.amount=amount;txn.note=note||'Loan: '+need(s,'LOANS',current.loan_id).name;set('TRANSACTIONS',txn);current.txn_id=txn.txn_id;}else{if(previous)remove('TRANSACTIONS',previous);current.txn_id='';}set('LOAN_PAYMENTS',current);loanStatus(current.loan_id);}title='Edit '+(r.table==='LOAN_PAYMENTS'?'loan payment':'fund or expense entry');
  }else if(action==='saveSettings'){
   if(args.length!==1)fail('Invalid arguments.');fields(r,['appName','payDays']);var settings={app_name:text(r.appName,30,true),pay_days:payDays(r.payDays)};Object.keys(settings).forEach(function(key){set('SETTINGS',{key:key,value:settings[key]});});title='Update app name and pay days';
  }else if(action==='generatePeriods'){
@@ -135,6 +135,7 @@ function loanMetrics_(loan, insts, pays, today) {
 
 function r2_(x){return Math.round((x+Number.EPSILON)*100)/100;}
 function isoOf_(y,m,d){return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');}
+function reportPeriod(periods,r,date){if(r.period_id)return r.period_id;var found='';periods.slice().sort(function(a,b){return a.pay_date.localeCompare(b.pay_date);}).forEach(function(p){if(p.pay_date<=date)found=p.period_id;});return found;}
 function view(snapshot) {
   const today = snapshot.state.today;
   const set = Object.assign({app_name:'Salary Ledger',pay_days:'15,EOM'},Object.fromEntries(live(snapshot,'SETTINGS').map(function(r){return [r.key,r.value];})));
@@ -159,10 +160,11 @@ function view(snapshot) {
     const m = (byCat[t.period_id] = byCat[t.period_id] || {});
     const sign = t.type === 'FUND_OUT' ? -1 : 1;
     m[t.category_id] = r2_((m[t.category_id] || 0) + sign * t.amount);
-    if (t.type === 'EXPENSE') spentBy[t.period_id] = (spentBy[t.period_id] || 0) + t.amount;
-    else fundBy[t.period_id] = (fundBy[t.period_id] || 0) + sign * t.amount;
+    const report=reportPeriod(periodsRaw,t,t.txn_date);
+    if (t.type === 'EXPENSE') spentBy[report] = (spentBy[report] || 0) + t.amount;
+    else fundBy[report] = (fundBy[report] || 0) + sign * t.amount;
   });
-  income.forEach(i => { incomeBy[i.period_id] = (incomeBy[i.period_id] || 0) + i.amount; hasInc[i.period_id] = true; });
+  income.forEach(i => { const report=reportPeriod(periodsRaw,i,i.received_date);incomeBy[report] = (incomeBy[report] || 0) + i.amount; hasInc[report] = true; });
 
   let current = null;
   periodsRaw.forEach(p => { if (p.pay_date <= today) current = p.period_id; });
@@ -213,7 +215,7 @@ function view(snapshot) {
   txns.forEach(t => {
     if (mirrored[t.txn_id]) return;
     const c = catById[t.category_id];
-    recent.push({ kind: 'txn', id: t.txn_id, date: t.txn_date, at: t.created_at, title: c ? c.name : '(deleted category)', amount: t.amount,
+    recent.push({ kind: 'txn', id: t.txn_id, date: t.txn_date, at: t.created_at, title: c ? c.name : (t.category_id?'(deleted category)':'Uncategorized'), amount: t.amount,
       dir: t.type === 'FUND_OUT' ? 'in' : 'out',
       sub: [t.type === 'EXPENSE' ? 'Expense' : t.type === 'FUND_IN' ? 'Fund deposit' : 'Fund withdrawal',
         perById[t.period_id] ? 'for ' + perById[t.period_id].label : '', t.note].filter(Boolean).join(' · ') });
@@ -237,5 +239,5 @@ function view(snapshot) {
   };
 }
 
-return {schemas:schemas,hash:hash,domain:domain,context:context,plan:plan,apply:apply,view:view,receipt:receipt,pk:pk};
+return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,context:context,plan:plan,apply:apply,view:view,reportPeriod:reportPeriod,receipt:receipt,pk:pk};
 })();
