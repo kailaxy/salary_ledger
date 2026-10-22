@@ -3,6 +3,11 @@ plugins { id 'com.android.application' }
 def releaseRequested = gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }
 def signingEnv = ['LEDGER_KEYSTORE_PATH', 'LEDGER_KEYSTORE_PASSWORD', 'LEDGER_KEY_ALIAS', 'LEDGER_KEY_PASSWORD']
 def signingValues = signingEnv.collectEntries { [(it): System.getenv(it)] }
+def debugKeystore = System.getenv('LEDGER_DEBUG_KEYSTORE_PATH')
+def debugPreview = System.getenv('LEDGER_DEBUG_PREVIEW') == 'true'
+if (System.getenv('LEDGER_REQUIRE_DEBUG_KEY') == 'true' && !debugKeystore) {
+    throw new GradleException('Persistent development builds require LEDGER_DEBUG_KEYSTORE_PATH; see android/README.md')
+}
 if (releaseRequested && signingValues.any { key, value -> !value }) {
     throw new GradleException('Release builds require all four LEDGER signing environment variables; see android/README.md')
 }
@@ -27,10 +32,19 @@ android {
         targetSdk 35
         versionCode buildNumber.toInteger()
         versionName '0.3.0'
+        resValue 'string', 'app_name', 'Salary Ledger'
         buildConfigField 'String', 'LEDGER_WEB_APP_URL', '"' + ledgerUrl + '"'
     }
     buildFeatures { buildConfig true }
     signingConfigs {
+        debug {
+            if (debugKeystore) {
+                storeFile file(debugKeystore)
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
+        }
         release {
             if (signingValues.every { key, value -> value }) {
                 storeFile file(signingValues.LEDGER_KEYSTORE_PATH)
@@ -41,6 +55,11 @@ android {
         }
     }
     buildTypes {
+        debug {
+            applicationIdSuffix debugPreview ? '.debug.preview' : '.debug'
+            versionNameSuffix debugPreview ? '-preview' : '-dev'
+            resValue 'string', 'app_name', debugPreview ? 'Salary Ledger Preview' : 'Salary Ledger Dev'
+        }
         release { signingConfig signingConfigs.release }
     }
     compileOptions {

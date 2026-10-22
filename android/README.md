@@ -8,7 +8,29 @@ The APK now bundles `Index.html`, served through WebViewAssetLoader at `https://
 
 Synchronize all pending changes in the current app and verify them in the Sheet first. The packaged page has a different origin from the former hosted WebView, so its IndexedDB and preferences start fresh. There is no automatic migration of unsynchronized records from the old origin. Do not clear app data or uninstall while any changes remain pending.
 
-Actions produces a debug APK for testing and an optional signed release APK for repeatable updates. Debug and release signatures differ: synchronize every pending change and verify the Sheet before the one-time switch from a debug installation. Android cannot install the release over a differently signed debug app. Do not uninstall or clear data while anything is pending. After switching, keep the same release signing key for all future updates.
+Build variants use separate Android packages and local storage:
+
+| Variant | Launcher name | Application ID | Signing |
+| --- | --- | --- | --- |
+| Release | Salary Ledger | `com.kailaxy.salaryledger` | Existing release secrets |
+| Development | Salary Ledger Dev | `com.kailaxy.salaryledger.debug` | Persistent debug secret on main |
+| PR/branch preview | Salary Ledger Preview | `com.kailaxy.salaryledger.debug.preview` | Temporary runner debug key |
+
+Development installs alongside release, preserving its installation and private data. Pair the development app separately; it starts with its own cache/outbox and Keystore credentials. By default both apps connect to the same Sheet: development writes still affect that Sheet. Use a separate test deployment when testing changes that should not reach your real ledger. There is no cross-app migration of pending records. Old debug APKs used the release application ID; synchronize their pending data before any replacement, and do not uninstall the working release to install the new Dev app.
+
+## Set up persistent development signing once
+
+On a trusted computer with Java keytool and base64 available, run from the repository root:
+
+```
+bash android/tools/create-debug-keystore.sh
+```
+
+This creates `salary-ledger-debug.jks` and `salary-ledger-debug.jks.b64` with private file permissions. Existing files are never overwritten. Keep the key backed up; both files are ignored by Git. In **Settings → Secrets and variables → Actions**, add repository secret **LEDGER_DEBUG_KEYSTORE_BASE64** containing the complete `.b64` file contents. Its standard debug alias/password are `androiddebugkey` / `android`; the private key itself must remain private. Do not reuse the release key or modify any release secrets.
+
+Automatic pushes on main and manual main runs with release disabled produce **salary-ledger-debug-apk**, signed with this same key. Missing/invalid debug secrets fail the development build instead of silently changing its signature. New builds can update the installed Dev app as version codes increase. Adding a secret does not trigger a workflow; manually run main with release disabled for the first build if needed. For local Dev updates, set `LEDGER_DEBUG_KEYSTORE_PATH` to this same key and use a newer `LEDGER_VERSION_CODE`; without it Gradle uses the local machine's normal debug key.
+
+Pull requests and non-main debug runs receive no signing secrets and build a separate Preview package. Preview signing is temporary, so these artifacts are disposable and may not update a previous preview. Manual release runs skip development/preview builds completely: they use only the existing release secrets and upload **salary-ledger-release-apk**. Missing debug secrets cannot block a release run.
 
 ## Set up stable release signing once
 
@@ -25,7 +47,7 @@ Back up this file and its passwords securely outside GitHub. Losing the key prev
 - `LEDGER_KEY_ALIAS`: `salary-ledger` (or the alias you chose).
 - `LEDGER_KEY_PASSWORD`: the key password (usually the same password for the default PKCS12 format).
 
-Run **Build Android APK** manually on **main**, enable **release**, then download **salary-ledger-release-apk** and install `app-release.apk`. Ordinary pushes still produce the debug artifact. Release signing is available only through manual runs on main, never pull requests. Missing secrets fail the release step; it never substitutes a debug key. The temporary key is removed after the step, and signature verification runs before upload. Keep the displayed certificate SHA-256 fingerprint as an update reference; it is public metadata.
+Run **Build Android APK** manually on **main**, enable **release**, then download **salary-ledger-release-apk** and install `app-release.apk`. Main pushes produce the separate Dev artifact after debug-secret setup. Release signing is available only through manual runs on main, never pull requests. Missing secrets fail the release step; it never substitutes a debug key. The temporary key is removed after the step, and signature verification runs before upload. Keep the displayed certificate SHA-256 fingerprint as an update reference; it is public metadata.
 
 CI assigns an increasing version code from the workflow run number. Reruns have the same code; use a new workflow run for the next update. Local builds default to version code 3; set `LEDGER_VERSION_CODE` to a higher integer for local updates. Local release builds also require `LEDGER_KEYSTORE_PATH`, `LEDGER_KEYSTORE_PASSWORD`, `LEDGER_KEY_ALIAS`, and `LEDGER_KEY_PASSWORD` in the process environment. Do not commit signing properties or keys. GitHub secret setup and the first real signed-device update must be completed by the owner; no production signing key is generated in this workspace.
 

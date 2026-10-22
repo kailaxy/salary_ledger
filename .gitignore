@@ -3,5 +3,7 @@
 local.properties
 *.jks
 *.keystore
+*.jks.b64
+*.keystore.b64
 
 node_modules/
