@@ -21,6 +21,26 @@ Salary Ledger tracks each paycheck from the moment it arrives: what you planned 
 ### Home
 Your summary at a glance: total saved (salary received minus spending), where your salary went (spent, moved to funds, not yet assigned), total loans owed, the current pay period, and a history of past pay periods.
 
+### Ask about your ledger
+Tap the compact Home question box to expand it. It works offline after the first download, includes non-conflicting pending changes, and never changes records through chat.
+
+Try:
+
+- “Magkano gastos ko this month?” or “Show October spending.”
+- “How much do I have left for Food?” or “Saan ako sumobra this cutoff?”
+- “How close am I to my Emergency Fund goal?”
+- “Contributions to Emergency Fund this month.”
+- “May utang ba akong due this month?” or “Next loan payment.”
+- “Did I spend more this cutoff than the previous one?”
+- “Average daily spending this month” or “Spending trends last 3 pay periods.”
+- “Can I afford 500 for Food?” — checks your remaining category plan, not your bank balance.
+
+Use your actual category/fund/loan names. Dates use the ledger timezone. Weeks start Monday; cutoff questions use your recorded pay periods. You can also use yesterday, last week, last month, this year, October 2026, or from 2026-10-01 to 2026-10-20. Balances/goals use all-time records; ask deposits, withdrawals or contributions for a selected period.
+
+Fund transfers are separate from income and spending. “Saved this month” means gross fund deposits; net contributions subtract withdrawals. “Income minus spending” and savings rate use recorded income and expenses, and are not bank balances. Loan payments count as spending only if a linked expense was recorded. Goal estimates require an explicit monthly contribution and assume no withdrawals, interest or other deposits.
+
+Ambiguous names, unsupported exclusions and extra conditions produce an explanation instead of a guessed answer. Missing records cannot establish actual cash or complete obligations. See [the supported-question reference](docs/assistant-questions.md) for examples, formulas and limits. No AI model is installed or required.
+
 ### Plan
 Decide what each paycheck is for.
 - Pick a pay period at the top, then type a planned amount beside each category or fund. Leaving the box opens a review. Confirm **Save on device** to queue the change.

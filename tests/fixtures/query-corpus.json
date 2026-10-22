@@ -1,0 +1,797 @@
+[
+  {
+    "question": "How much did I spend this month?",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "expense",
+      "range": "this_month"
+    }
+  },
+  {
+    "question": "My spending this month?",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "expense",
+      "range": "this_month"
+    }
+  },
+  {
+    "question": "Magkano gastos ko this month?",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "expense",
+      "range": "this_month"
+    }
+  },
+  {
+    "question": "What were my expenses this month?",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "expense",
+      "range": "this_month"
+    }
+  },
+  {
+    "question": "Show expenses this month",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "expense",
+      "range": "this_month"
+    }
+  },
+  {
+    "question": "Total expenses for October",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "expense",
+      "range": "dates",
+      "startDate": "2026-10-01",
+      "endDate": "2026-10-31"
+    }
+  },
+  {
+    "question": "Show October spending",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "expense",
+      "range": "dates",
+      "startDate": "2026-10-01",
+      "endDate": "2026-10-31"
+    }
+  },
+  {
+    "question": "total expenses in October 2026",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "expense",
+      "range": "dates",
+      "startDate": "2026-10-01",
+      "endDate": "2026-10-31"
+    }
+  },
+  {
+    "question": "total expenses today",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "expense",
+      "range": "today"
+    }
+  },
+  {
+    "question": "total expenses yesterday",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "expense",
+      "range": "yesterday"
+    }
+  },
+  {
+    "question": "total expenses this week",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "expense",
+      "range": "this_week"
+    }
+  },
+  {
+    "question": "total expenses last week",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "expense",
+      "range": "last_week"
+    }
+  },
+  {
+    "question": "total expenses last month",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "expense",
+      "range": "last_month"
+    }
+  },
+  {
+    "question": "total expenses this year",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "expense",
+      "range": "this_year"
+    }
+  },
+  {
+    "question": "Magkano na nagastos ko this payday?",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "expense",
+      "range": "current_period"
+    }
+  },
+  {
+    "question": "total expenses last cutoff",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "expense",
+      "range": "previous_period"
+    }
+  },
+  {
+    "question": "total expenses last 2 pay periods",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "expense",
+      "range": "last_periods",
+      "periodCount": 2
+    }
+  },
+  {
+    "question": "total expenses from 2026-10-01 to 2026-10-20",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "expense",
+      "range": "dates",
+      "startDate": "2026-10-01",
+      "endDate": "2026-10-20"
+    }
+  },
+  {
+    "question": "How much did I spend on FOOD last month?",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "expense",
+      "range": "last_month",
+      "categoryId": "food"
+    }
+  },
+  {
+    "question": "spending on pagkain last month",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "expense",
+      "range": "last_month",
+      "categoryId": "food"
+    }
+  },
+  {
+    "question": "magkano gastos ko sa food last month",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "expense",
+      "range": "last_month",
+      "categoryId": "food"
+    }
+  },
+  {
+    "question": "How much salary did I receive this month?",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "income",
+      "range": "this_month",
+      "incomeKind": "SALARY"
+    }
+  },
+  {
+    "question": "total bonus this month",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "income",
+      "range": "this_month",
+      "incomeKind": "BONUS"
+    }
+  },
+  {
+    "question": "total other income this month",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "income",
+      "range": "this_month",
+      "incomeKind": "OTHER"
+    }
+  },
+  {
+    "question": "Magkano sahod ko this month?",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "income",
+      "range": "this_month",
+      "incomeKind": "SALARY"
+    }
+  },
+  {
+    "question": "total income this month",
+    "query": {
+      "action": "query",
+      "operation": "sum",
+      "kind": "income",
+      "range": "this_month"
+    }
+  },
+  {
+    "question": "What's my biggest expense this month?",
+    "query": {
+      "action": "query",
+      "operation": "max",
+      "kind": "expense",
+      "range": "this_month"
+    }
+  },
+  {
+    "question": "smallest expense this month",
+    "query": {
+      "action": "query",
+      "operation": "min",
+      "kind": "expense",
+      "range": "this_month"
+    }
+  },
+  {
+    "question": "Ano pinakamalaking gastos ko this month?",
+    "query": {
+      "action": "query",
+      "operation": "max",
+      "kind": "expense",
+      "range": "this_month"
+    }
+  },
+  {
+    "question": "Show my top five expenses",
+    "query": {
+      "action": "query",
+      "operation": "top",
+      "kind": "expense",
+      "range": "all",
+      "limit": 5
+    }
+  },
+  {
+    "question": "average daily spending this month",
+    "query": {
+      "action": "query",
+      "operation": "average",
+      "kind": "expense",
+      "range": "this_month",
+      "unit": "day"
+    }
+  },
+  {
+    "question": "average weekly spending this month",
+    "query": {
+      "action": "query",
+      "operation": "average",
+      "kind": "expense",
+      "range": "this_month",
+      "unit": "week"
+    }
+  },
+  {
+    "question": "average monthly spending this month",
+    "query": {
+      "action": "query",
+      "operation": "average",
+      "kind": "expense",
+      "range": "this_month",
+      "unit": "month"
+    }
+  },
+  {
+    "question": "average per pay period spending last 3 pay periods",
+    "query": {
+      "action": "query",
+      "operation": "average",
+      "kind": "expense",
+      "range": "last_periods",
+      "unit": "period",
+      "periodCount": 3
+    }
+  },
+  {
+    "question": "spending by category this cutoff",
+    "query": {
+      "action": "query",
+      "operation": "categories",
+      "kind": "expense",
+      "range": "current_period"
+    }
+  },
+  {
+    "question": "Which category ate most of my paycheck?",
+    "query": {
+      "action": "query",
+      "operation": "categories",
+      "kind": "expense",
+      "range": "current_period"
+    }
+  },
+  {
+    "question": "Saan napunta sahod ko?",
+    "query": {
+      "action": "query",
+      "operation": "categories",
+      "kind": "expense",
+      "range": "current_period"
+    }
+  },
+  {
+    "question": "Compare this month's expenses with last month's",
+    "query": {
+      "action": "query",
+      "operation": "compare",
+      "kind": "expense",
+      "range": "this_month"
+    }
+  },
+  {
+    "question": "Did I spend more this cutoff than the previous one?",
+    "query": {
+      "action": "query",
+      "operation": "compare",
+      "kind": "expense",
+      "range": "current_period"
+    }
+  },
+  {
+    "question": "Compare gastos ko last cutoff.",
+    "query": {
+      "action": "query",
+      "operation": "compare",
+      "kind": "expense",
+      "range": "current_period"
+    }
+  },
+  {
+    "question": "Which budgets am I exceeding?",
+    "query": {
+      "action": "query",
+      "operation": "budgets",
+      "kind": "expense",
+      "range": "current_period",
+      "mode": "over"
+    }
+  },
+  {
+    "question": "Am I still within my budget?",
+    "query": {
+      "action": "query",
+      "operation": "budgets",
+      "kind": "expense",
+      "range": "current_period",
+      "mode": "over"
+    }
+  },
+  {
+    "question": "Saan ako sumobra this cutoff?",
+    "query": {
+      "action": "query",
+      "operation": "budgets",
+      "kind": "expense",
+      "range": "current_period",
+      "mode": "over"
+    }
+  },
+  {
+    "question": "Magkano natira sa budget ko?",
+    "query": {
+      "action": "query",
+      "operation": "budgets",
+      "kind": "expense",
+      "range": "current_period",
+      "mode": "remaining"
+    }
+  },
+  {
+    "question": "budget utilization",
+    "query": {
+      "action": "query",
+      "operation": "budgets",
+      "kind": "expense",
+      "range": "current_period",
+      "mode": "utilization"
+    }
+  },
+  {
+    "question": "unallocated paycheck",
+    "query": {
+      "action": "query",
+      "operation": "budgets",
+      "kind": "expense",
+      "range": "current_period",
+      "mode": "unallocated"
+    }
+  },
+  {
+    "question": "How much do I have left for food?",
+    "query": {
+      "action": "query",
+      "operation": "budgets",
+      "kind": "expense",
+      "range": "current_period",
+      "mode": "remaining",
+      "categoryId": "food"
+    }
+  },
+  {
+    "question": "compare budgets across pay periods",
+    "query": {
+      "action": "query",
+      "operation": "budgets",
+      "kind": "expense",
+      "range": "current_period",
+      "mode": "compare"
+    }
+  },
+  {
+    "question": "can i afford 50 for food",
+    "query": {
+      "action": "query",
+      "operation": "afford",
+      "kind": "expense",
+      "range": "current_period",
+      "amountMinor": 5000,
+      "categoryId": "food"
+    }
+  },
+  {
+    "question": "fund balances",
+    "query": {
+      "action": "query",
+      "operation": "funds",
+      "kind": "expense",
+      "range": "all",
+      "mode": "balance"
+    }
+  },
+  {
+    "question": "Magkano savings ko ngayon?",
+    "query": {
+      "action": "query",
+      "operation": "funds",
+      "kind": "expense",
+      "range": "all",
+      "mode": "balance"
+    }
+  },
+  {
+    "question": "Magkano na laman ng savings ko?",
+    "query": {
+      "action": "query",
+      "operation": "funds",
+      "kind": "expense",
+      "range": "all",
+      "mode": "balance"
+    }
+  },
+  {
+    "question": "balance of Emergency-Fund",
+    "query": {
+      "action": "query",
+      "operation": "funds",
+      "kind": "expense",
+      "range": "all",
+      "mode": "balance",
+      "categoryId": "fund"
+    }
+  },
+  {
+    "question": "How close am I to my emergency fund goal?",
+    "query": {
+      "action": "query",
+      "operation": "funds",
+      "kind": "expense",
+      "range": "all",
+      "mode": "goal",
+      "categoryId": "fund"
+    }
+  },
+  {
+    "question": "How much more do I need for my emergency fund target?",
+    "query": {
+      "action": "query",
+      "operation": "funds",
+      "kind": "expense",
+      "range": "all",
+      "mode": "goal",
+      "categoryId": "fund"
+    }
+  },
+  {
+    "question": "How much have I saved this month?",
+    "query": {
+      "action": "query",
+      "operation": "funds",
+      "kind": "expense",
+      "range": "this_month",
+      "mode": "deposits"
+    }
+  },
+  {
+    "question": "withdrawals from emergency fund this cutoff",
+    "query": {
+      "action": "query",
+      "operation": "funds",
+      "kind": "expense",
+      "range": "current_period",
+      "mode": "withdrawals",
+      "categoryId": "fund"
+    }
+  },
+  {
+    "question": "when will i reach emergency fund goal if i save 50 monthly",
+    "query": {
+      "action": "query",
+      "operation": "funds",
+      "kind": "expense",
+      "range": "all",
+      "mode": "goal",
+      "categoryId": "fund",
+      "contributionMinor": 5000
+    }
+  },
+  {
+    "question": "How much do I still owe?",
+    "query": {
+      "action": "query",
+      "operation": "loans",
+      "kind": "expense",
+      "range": "all",
+      "mode": "balance"
+    }
+  },
+  {
+    "question": "How much debt have I paid off?",
+    "query": {
+      "action": "query",
+      "operation": "loans",
+      "kind": "expense",
+      "range": "all",
+      "mode": "paid"
+    }
+  },
+  {
+    "question": "paid versus unpaid installments",
+    "query": {
+      "action": "query",
+      "operation": "loans",
+      "kind": "expense",
+      "range": "all",
+      "mode": "installments"
+    }
+  },
+  {
+    "question": "overdue installments",
+    "query": {
+      "action": "query",
+      "operation": "loans",
+      "kind": "expense",
+      "range": "all",
+      "mode": "overdue"
+    }
+  },
+  {
+    "question": "next loan payment",
+    "query": {
+      "action": "query",
+      "operation": "loans",
+      "kind": "expense",
+      "range": "all",
+      "mode": "next"
+    }
+  },
+  {
+    "question": "loan repayment progress",
+    "query": {
+      "action": "query",
+      "operation": "loans",
+      "kind": "expense",
+      "range": "all",
+      "mode": "progress"
+    }
+  },
+  {
+    "question": "What loans are due next payday?",
+    "query": {
+      "action": "query",
+      "operation": "loans",
+      "kind": "expense",
+      "range": "next_period",
+      "mode": "due"
+    }
+  },
+  {
+    "question": "May utang ba akong due this month?",
+    "query": {
+      "action": "query",
+      "operation": "loans",
+      "kind": "expense",
+      "range": "this_month",
+      "mode": "due"
+    }
+  },
+  {
+    "question": "May due ba akong loans?",
+    "query": {
+      "action": "query",
+      "operation": "loans",
+      "kind": "expense",
+      "range": "this_month",
+      "mode": "due"
+    }
+  },
+  {
+    "question": "balance for loan phone",
+    "query": {
+      "action": "query",
+      "operation": "loans",
+      "kind": "expense",
+      "range": "all",
+      "mode": "balance",
+      "loanId": "loan"
+    }
+  },
+  {
+    "question": "income minus spending this month",
+    "query": {
+      "action": "query",
+      "operation": "cashflow",
+      "kind": "expense",
+      "range": "this_month"
+    }
+  },
+  {
+    "question": "How much of my salary have I spent?",
+    "query": {
+      "action": "query",
+      "operation": "share",
+      "kind": "expense",
+      "range": "current_period",
+      "incomeBasis": "salary"
+    }
+  },
+  {
+    "question": "savings rate this month",
+    "query": {
+      "action": "query",
+      "operation": "savings_rate",
+      "kind": "expense",
+      "range": "this_month"
+    }
+  },
+  {
+    "question": "most frequent expense categories",
+    "query": {
+      "action": "query",
+      "operation": "frequency",
+      "kind": "expense",
+      "range": "all"
+    }
+  },
+  {
+    "question": "recurring expenses",
+    "query": {
+      "action": "query",
+      "operation": "recurring",
+      "kind": "expense",
+      "range": "all"
+    }
+  },
+  {
+    "question": "spending trends last 3 pay periods",
+    "query": {
+      "action": "query",
+      "operation": "trends",
+      "kind": "expense",
+      "range": "last_periods",
+      "periodCount": 3
+    }
+  },
+  {
+    "question": "top five expenses excluding rent",
+    "error": true
+  },
+  {
+    "question": "total expenses last month excluding food",
+    "error": true
+  },
+  {
+    "question": "income minus spending before tax",
+    "error": true
+  },
+  {
+    "question": "how much do i owe excluding phone",
+    "error": true
+  },
+  {
+    "question": "how much can i spend from my bank account",
+    "error": true
+  },
+  {
+    "question": "Add a 500 food expense",
+    "error": true
+  },
+  {
+    "question": "show October spending except rent",
+    "error": true
+  },
+  {
+    "question": "how much have i saved excluding withdrawals",
+    "error": true
+  },
+  {
+    "question": "total expenses this month but only weekends",
+    "error": true
+  },
+  {
+    "question": "which loan should i stop paying",
+    "error": true
+  },
+  {
+    "question": "total expenses last 25 pay periods",
+    "error": true
+  },
+  {
+    "question": "total expenses from 2026-02-30 to 2026-03-03",
+    "error": true
+  },
+  {
+    "question": "total expenses next month",
+    "error": true
+  },
+  {
+    "question": "spending on deleted",
+    "error": true
+  },
+  {
+    "question": "spending on unknown",
+    "error": true
+  },
+  {
+    "question": "can i afford 500",
+    "error": true
+  },
+  {
+    "question": "how close am i to my target?",
+    "error": true
+  }
+]

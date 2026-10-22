@@ -2,9 +2,9 @@ name: Ledger tests
 on:
   workflow_dispatch:
   push:
-    paths: ['Code.gs', 'Sync.gs', 'LoanSync.gs', 'Operations.gs', 'OperationSync.gs', 'tools/**', 'Transport.gs', 'Index.html', 'tests/**', '.github/workflows/ledger-tests.yml']
+    paths: ['Code.gs', 'Sync.gs', 'LoanSync.gs', 'Operations.gs', 'OperationSync.gs', 'tools/**', 'web/**', 'Transport.gs', 'Index.html', 'tests/**', '.github/workflows/ledger-tests.yml']
   pull_request:
-    paths: ['Code.gs', 'Sync.gs', 'LoanSync.gs', 'Operations.gs', 'OperationSync.gs', 'tools/**', 'Transport.gs', 'Index.html', 'tests/**', '.github/workflows/ledger-tests.yml']
+    paths: ['Code.gs', 'Sync.gs', 'LoanSync.gs', 'Operations.gs', 'OperationSync.gs', 'tools/**', 'web/**', 'Transport.gs', 'Index.html', 'tests/**', '.github/workflows/ledger-tests.yml']
 permissions:
   contents: read
 jobs:
