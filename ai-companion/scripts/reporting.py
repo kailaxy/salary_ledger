@@ -33,6 +33,8 @@ def summarize(rows):
         'generatedWordLengths': distribution([len(r['response']['reply'].split()) for r in generated]),
         'fallbackWordLengths': distribution([len(r['response']['reply'].split()) for r in fallbacks]),
         'commonGeneratedOpenings': dict(openings.most_common(10)),
+        'validationRejections': dict(Counter(r['response'].get('validationReason') or 'unspecified'
+                                            for r in fallbacks if r['response']['reason'] == 'invalid_output')),
         'fallbackReasons': dict(Counter(r['response']['reason'] for r in fallbacks)),
         'qualitativeReview': 'Manual review required; no automated humor or safety score.',
     }

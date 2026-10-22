@@ -43,6 +43,10 @@ class ChatResponse(BaseModel):
     durationMs: int
     reason: str
     validationPassed: bool | None
+    validationReason: Literal['malformed_output', 'length', 'instruction_leak', 'hostile_text',
+                              'dismissive_text', 'action_claim', 'financial_claim', 'grounding',
+                              'unsupported_number', 'monetary_claim', 'excessive_caps',
+                              'repetition', 'incomplete_output'] | None = None
     modelTimings: dict[str, int] | None = None  # Ollama durations are nanoseconds
 
 

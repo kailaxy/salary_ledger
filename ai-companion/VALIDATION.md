@@ -25,3 +25,10 @@ Actual generation quality, hardware latency and Ollama resource release remain u
 - Baseline inference options, unloading requests, concurrency limits, localhost boundary, public schemas and production app isolation remain unchanged. The optional seed is unset by default.
 
 The additional grounding lexicons and explicit-negation handling are deliberately narrow. They can miss paraphrases, compound quantities and unsupported properties outside the small vocabulary, and may reject harmless metaphors. Original monetary/percentage restrictions remain conservative. Manually review actual laptop outputs, source-specific timings, cold-load costs, variation and cleanup behavior before claiming improvement.
+
+## Patch following the supplied quality export
+
+- **153 unit tests passed**, one unchanged dependency deprecation warning. Added tests exercise all three observed spelled-out monetary replies, both observed dismissive replies, additional currency spellings, ordinary count/idiom acceptance, fixed diagnostic categories, API fallback privacy and legacy report compatibility.
+- Revalidated the **34 previously accepted replies** in the user's supplied quality export, without generating new text: the patched validator rejects **three monetary claims** and **two dismissive replies**; the other **29 still pass**. This is replay validation, not evidence that new Gemma outputs will improve. The uploaded export and its replies were not committed.
+- Repeated the real loopback HTTP harness smoke test: **66 requests completed, zero Gemma replies**, with output-file preservation, private permissions and comparison checks passing. Temporary server stopped. No live model is available in this workspace.
+- Output diagnostics are fixed categories only; rejected generations remain absent from responses and files. The prompt edits' impact on repetition, relevance and latency must be measured on the laptop. No inference settings, retry behavior, resource lifecycle or production app code changed.

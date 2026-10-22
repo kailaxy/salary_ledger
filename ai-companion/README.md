@@ -199,3 +199,27 @@ python scripts/compare.py results/v1-baseline.local.json results/benchmark-YOUR-
 The utility accepts original v1 JSON rows. It reports source counts, average/median/min/max client latency separately for generated/fallback replies, handler duration, load/prompt-evaluation/generation/total model milliseconds, token counts, output word lengths, fallback reasons and common two-word generated openings. Missing metrics remain null rather than zero. Markdown benchmark output includes the same summary. Repeated openings are a development diagnostic, not an automated humor score; fallbacks are excluded from that opening report.
 
 See [BASELINE.md](BASELINE.md) for the supplied laptop baseline and optional old-commit workflow, and [VALIDATION.md](VALIDATION.md) for actual cloud checks. The baseline inference options, one-generation admission, no retries and `keep_alive:0` remain unchanged. Shorter instructions and zero/one examples bound prompt overhead, but actual tokenizer counts and speed require laptop measurements; prompt changes cannot eliminate cold loading. Review jokes, relevance, factual anchoring and variety manually across matched runs. Neither 14 nor 19 passing scenarios establishes comprehensive conversational reliability.
+
+## Benchmark-driven monetary and style patch
+
+The response schema now includes optional `validationReason`: null for accepted replies and paths without output validation, or a fixed rejection category when a generation is rejected. The existing `source:fallback`, `reason:invalid_output` and `validationPassed:false` behavior is preserved. Categories distinguish monetary claims, unsupported numbers, grounding, financial/action claims, dismissive/hostile text, instruction leaks, malformed/long/incomplete output, excessive capitals and repetition. No rejected text or exception is included. This adds no conversation storage or raw-output logging.
+
+Benchmark JSON automatically retains the new field; summaries, Markdown and `scripts/compare.py` include `validationRejections`. Old exports without categories report `unspecified`; their rejected generations cannot be recovered. No model retry or second generation is added.
+
+Currency vocabulary now includes bucks, quid, cents/centavos and additional named currencies, with narrow numeric-context checks for singular buck and grand. This rejects spelled-out amounts with these units even when they echo user input. Ordinary counts and idioms such as “a grand entrance” remain allowed. The checks are not a general number parser or semantic verifier: uncommon slang and paraphrases can still escape, and unit words can cause conservative false positives.
+
+Prompts explicitly omit monetary restatements, favor specific openings over “Seriously?”/superhero praise, and invite conversation rather than dismissing boredom or tiredness. The Gremlin's high-chaos demonstrations now model concrete observations instead of generic hype. These are guidance, not proof of improved humor or variety. A narrow dismissiveness check catches the observed replies; it does not classify every unkind sentence. Common openings are not globally banned and no conversation history is kept.
+
+After pulling, stop and restart the API, then rerun the quality benchmark:
+
+```bash
+cd ~/Projects/salary_ledger
+# Preserve tracked local modifications before pulling.
+git status --short
+git pull --ff-only origin main
+cd ai-companion
+source .venv/bin/activate
+./scripts/start.sh
+```
+
+In another activated terminal in `ai-companion`, run `python scripts/benchmark.py --suite quality --repeat 3 --markdown`. Inspect `validationRejections`, generated openings and actual replies; repeated “Seriously?” responses may still require further prompt tuning. Compare matched runs with the existing comparison utility.

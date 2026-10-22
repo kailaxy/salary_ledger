@@ -12,7 +12,7 @@ from .schemas import ChatRequest, ChatResponse, HealthResponse
 from .policy import classify
 from .fallback import fallback
 from .prompt_builder import messages
-from .response_validator import validate
+from .response_validator import check_response
 from .ollama_client import OllamaClient
 
 
@@ -121,6 +121,7 @@ def create_app(config=None, client=None):
         start = time.perf_counter()
         decision = classify(payload.message, payload.tone)
         reply = fallback(payload, decision)
+        validation_reason = None
         source, reason, passed, timings = 'fallback', decision.reason or 'unavailable', None, None
         if decision.reason is None:
             if app.state.active >= config.max_in_flight:
@@ -133,10 +134,11 @@ def create_app(config=None, client=None):
                 try:
                     raw, timings = await await_generation(client, messages(payload, decision), request)
                     completed = True
-                    checked = validate(raw, payload.message)
-                    passed = checked is not None
+                    checked = check_response(raw, payload.message)
+                    validation_reason = checked.reason
+                    passed = checked.reply is not None
                     if passed:
-                        reply, source, reason = checked, 'gemma', 'generated'
+                        reply, source, reason = checked.reply, 'gemma', 'generated'
                     else:
                         reason = 'invalid_output'
                 except (TimeoutError, asyncio.TimeoutError):
@@ -161,5 +163,5 @@ def create_app(config=None, client=None):
                             requestedTone=payload.tone, tone=decision.tone, source=source,
                             model=config.model if source == 'gemma' else None,
                             durationMs=round((time.perf_counter()-start)*1000), reason=reason,
-                            validationPassed=passed, modelTimings=timings)
+                            validationPassed=passed, validationReason=validation_reason, modelTimings=timings)
     return app
