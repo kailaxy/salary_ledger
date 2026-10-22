@@ -13,8 +13,7 @@ module.exports=async function({page,native}){
  assert.match(await current().innerText(),/Confirm and save/);assert.match(await current().innerText(),/₱250.00/);assert.equal((await count()).entries,0);
  await ask('yes');assert.match(await current().innerText(),/chat reply cannot save/);assert.equal((await count()).entries,0);
  await current().getByRole('button',{name:'Cancel',exact:true}).click();assert.match(await current().innerText(),/Nothing saved/);assert.equal((await count()).entries,0);
- await ask('Add 250 food today');await current().getByRole('button',{name:'2026-10-15 · 2026-10-15',exact:true}).click();
- await current().getByRole('button',{name:'Add or change note'}).click();await current().getByRole('textbox',{name:'Note',exact:true}).fill('<img src=x onerror=alert(1)>');await current().getByRole('button',{name:'Use note',exact:true}).click();assert.equal(await current().locator('img').count(),0);
+ await ask('Add 250 food today note <img src=x onerror=alert(1)>');await current().getByRole('button',{name:'2026-10-15 · 2026-10-15',exact:true}).click();assert.deepEqual(await current().getByRole('button').allTextContents(),['Confirm and save','Cancel']);assert.equal(await current().locator('img').count(),0);
  for(const width of [320,393,768]){await page.setViewportSize({width,height:852});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.equal(await current().evaluate(el=>el.scrollWidth>el.clientWidth),false);}
  await current().getByRole('button',{name:'Confirm and save',exact:true}).evaluate(b=>{b.click();b.click();});
  await page.waitForFunction(()=>document.querySelector('.assistant-save-status')?.textContent.includes('Saved on this device'));

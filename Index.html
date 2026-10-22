@@ -2086,7 +2086,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
     var resolved;try{resolved=AssistantActions.resolve(d.id,d.params,ledgerSnapshot);d.params=resolved.params;}catch(e){d.message.textContent=e.message;assistantButton(box,'Discard draft',function(){assistantCancel();});return;}
     var labels={amountMinor:'Amount',categoryId:d.id.indexOf('fund.')===0?'Fund':'Category',kind:'Income type',date:'Date',periodId:d.id==='expense.create'?'Plan link':'Reporting period',note:'Note',source:'Source'};
     var grid=assistantElement(box,'dl',undefined,'assistant-preview');
-    Object.keys(d.params).forEach(function(k){assistantElement(grid,'dt',labels[k]);var cell=assistantElement(grid,'dd');var choices=AssistantActions.choices(d.id,k,ledgerSnapshot,d.params),choice=choices.find(function(c){return c.value===d.params[k];});assistantElement(cell,'span',k==='amountMinor'?ledgerSnapshot.currency+nf.format(d.params[k]/100):choice?choice.label:d.params[k]||'None');assistantButton(cell,'Change '+labels[k].toLowerCase(),function(){d.editing=k;assistantRender();});});
+    Object.keys(d.params).forEach(function(k){assistantElement(grid,'dt',labels[k]);var cell=assistantElement(grid,'dd');var choices=AssistantActions.choices(d.id,k,ledgerSnapshot,d.params),choice=choices.find(function(c){return c.value===d.params[k];});assistantElement(cell,'span',k==='amountMinor'?ledgerSnapshot.currency+nf.format(d.params[k]/100):choice?choice.label:d.params[k]||'None');});
     var field=d.editing||resolved.missing[0];
     if(field){
       var questions={amountMinor:'How much should I record?',categoryId:'Which '+labels.categoryId.toLowerCase()+' should I use?',kind:'What type of income is this?',date:'Which date should I use?',periodId:ledgerSnapshot.capabilities.optionalPlanningVersion===1?'Which existing plan should this expense use?':'Which existing pay period should this belong to?',note:'What note would you like?',source:'What source would you like?'};
@@ -2108,10 +2108,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
         var t=d.id==='income.create'?'Income':d.id.indexOf('fund.')===0?'Fund':'Expense',p=d.params;
         d.prepared=prepareLocalEntry(t,{periodId:p.periodId,date:p.date,categoryId:p.categoryId,kind:p.kind,source:p.source||'',note:p.note||'',type:d.id==='fund.withdraw'?'FUND_OUT':'FUND_IN'},p.amountMinor,null);
         d.prepared.expectedLocalView=JSON.stringify([cloudSnapshot.ledgerId,cloudSnapshot.capturedAt,cloudSnapshot.tables,LedgerPending.order(pendingEntries)]);
-        if(ledgerSnapshot.capabilities.optionalPlanningVersion===1){if(d.id==='expense.create'){assistantButton(box,'Link to a plan (optional)',function(){d.editing='periodId';assistantRender();});assistantButton(box,'Choose category (optional)',function(){d.editing='categoryId';assistantRender();});}}
-        d.message.textContent='Review the details above. Nothing is saved until you press Confirm and save.';
-        assistantButton(box,'Add or change note',function(){d.editing='note';assistantRender();});
-        if(d.id==='income.create')assistantButton(box,'Add or change source',function(){d.editing='source';assistantRender();});
+        d.message.textContent='Review this entry. Nothing is saved until you confirm.';
         var confirm=assistantButton(box,'Confirm and save',function(){assistantConfirm(d);});confirm.classList.add('solid');
       }catch(e){d.message.textContent=e.message;}
     }

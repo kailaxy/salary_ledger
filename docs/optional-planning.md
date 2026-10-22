@@ -4,7 +4,7 @@ New expenses are actual records, not allocations. In the assistant, “Add 80 fa
 
 A Food plan of ₱1,000 remains ₱1,000 after an unlinked ₱250 Food expense. Explicitly link a ₱250 expense to that plan and its remaining allowance becomes ₱750. Unlinked and linked expenses both count in actual spending totals. Only linked expenses consume a plan. Editing an expense to remove its link restores its plan allowance; deleting it removes its spending contribution without deleting the plan.
 
-The assistant offers “Choose category (optional)” and “Link to a plan (optional)”. The latter offers only existing periods with a plan for the chosen category. Changing category clears the previous link; it does not silently move the expense onto another category’s plan. The regular Add form also defaults to Uncategorized / No plan linked, and clears plan selection after saving or switching record type. Existing linked records retain their association when opened for editing; users can explicitly choose No plan linked. Planning itself still requires a real category and period.
+Completed assistant previews are read-only and offer only Confirm and save / Cancel. Optional category and plan controls remain in the regular Add/edit workflow; its plan selector offers existing periods with a plan for the chosen category. Changing category clears the previous link; it does not silently move the expense onto another category’s plan. The regular Add form also defaults to Uncategorized / No plan linked, and clears plan selection after saving or switching record type. Existing linked records retain their association when opened for editing; users can explicitly choose No plan linked. Planning itself still requires a real category and period.
 
 ## Other workflows audited
 
