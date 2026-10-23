@@ -79,7 +79,7 @@ There is no permissive CORS middleware. Cross-origin browser requests with Origi
 
 ## Personality, tone and policy
 
-Central style specifications implement three presets and five chaos bands: 0–20 straightforward, 21–40 subtle, 41–60 witty, 61–80 playful, 81–100 expressive but bounded. Tone and policy always override chaos. Prompts use concise English and one personality/tone-specific demonstration above chaos 20, otherwise none (never more than three); the user message stays a separate, untrusted user message.
+Central style specifications implement three presets and five chaos bands: 0–20 straightforward, 21–40 subtle, 41–60 witty, 61–80 playful, 81–100 expressive but bounded. Tone and policy always override chaos. The current app-aware prompt uses zero demonstration dialogues at every chaos level; the user message stays a separate, untrusted user message. Fixed server context explains the tracker and the companion’s role without claiming access to real records or save events.
 
 A deliberately limited pattern policy bypasses generation for medical expenses, expressed hardship, essential spending, explicitly supportive requests, financial questions without ledger data, and unsupported record/tool requests. Contradictory playful/celebratory labels do not override these paths. The API cannot accept verified ledger facts in this phase and never computes a financial answer. Milestone reactions respond to a user's statement, not an independently verified achievement.
 
@@ -231,3 +231,31 @@ Output completion now uses Ollama metadata when available: `done:true` with `don
 For older Ollama versions that omit the reason, a conservative ending heuristic remains. It now handles closing quotes/format markers, Unicode symbol/emoji endings, variation selectors and skin-tone modifiers rather than a short emoji whitelist. `incomplete_output` on that legacy path is a heuristic label, not proof of truncation. Neither a stop reason nor punctuation guarantees grammatical or factual correctness; all other content checks still run. Previous exports lack the rejected text, so the thirteen earlier ending rejections cannot be retrospectively classified as true or false positives.
 
 Narrow checks also reject the observed dismissive “that's just...sad”/“hear about my day” responses and unsupported ownership/absolute-status phrases such as “officially yours,” “completely free,” “own it outright” and “clean title.” A loan repayment establishes neither legal title nor the absence of other obligations. These remain limited pattern checks, with possible missed paraphrases and conservative false positives. No further personality rewrite or conversation storage was introduced.
+
+
+## App-aware context experiment
+
+The current prompt explains that Salary Ledger tracks income/expenses with optional spending plans, and that users discuss purchases, habits, milestones and everyday life. The companion offers a contextual conversational reaction; the app owns calculations, records and confirmations. Buying coffee is not evidence that an expense was saved. User text remains untrusted and cannot become a verified app event.
+
+All few-shot dialogues have been removed for this experiment, across presets and chaos levels. The laptop runs suggested unrelated cleaning/music demonstrations were contaminating replies; removing them eliminates that prompt source, not every possible hallucination. Distinct personality and chaos instructions, policy fallbacks, grounding validation, completion handling and inference settings remain unchanged. No ledger records, history, event payloads or financial actions were added. `event` and `saveStatus` remain rejected request fields. Trusted event context is future work, not part of this isolated API.
+
+Compare against the saved pre-patch quality export using the same preset, chaos, scenarios and repeat count:
+
+```bash
+# Stop the old API with Ctrl+C first. Preserve tracked local modifications.
+cd ~/Projects/salary_ledger
+git status --short
+git pull --ff-only origin main
+cd ai-companion
+source .venv/bin/activate
+./scripts/start.sh
+```
+
+In another activated terminal in `ai-companion`:
+
+```bash
+python scripts/benchmark.py --suite quality --repeat 3 --markdown
+python scripts/compare.py results/benchmark-20261023T020019922388Z.local.json results/NEW-TIMESTAMP.local.json
+```
+
+Use the actual new filename printed by the benchmark. Review specific relevance, invented backstory, template repetition and tone manually; accepted-output counts alone do not establish quality. This patch changes both role context and example removal, so a before/after difference cannot isolate either factor. No speed or humor improvement is claimed: actual token counts and latency need laptop measurement, and cold-load costs remain.

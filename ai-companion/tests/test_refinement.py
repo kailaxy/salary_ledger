@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from app.schemas import ChatRequest, Tone
 from app.policy import classify
-from app.prompt_builder import messages, EXAMPLES
+from app.prompt_builder import messages
 from app.personality import style
 from app.response_validator import validate
 from app.config import Config
@@ -55,7 +55,7 @@ def test_chaos_boundaries(value,band):
     assert band in style('financial_gremlin',value)
 
 
-def test_compact_distinct_prompts_and_examples():
+def test_compact_distinct_app_aware_prompts_without_examples():
     for tone in ['playful','celebratory']:
         prompts=[]
         for p in ['financial_gremlin','supportive_bestie','sarcastic_accountant']:
@@ -64,13 +64,11 @@ def test_compact_distinct_prompts_and_examples():
                 # Direct builder exercise; policy would bypass this hostile text.
                 from app.policy import Decision
                 prompt=messages(r,Decision(Tone(tone)))
-                assert sum(x['role']=='assistant' for x in prompt) == (0 if chaos<=20 else 1)
-                assert sum(len(x['content'].split()) for x in prompt[:-1]) <= 155
+                assert [x['role'] for x in prompt] == ['system', 'user']
+                assert sum(len(x['content'].split()) for x in prompt[:-1]) <= 190
                 assert prompt[-1]['content'] == r.message
             prompts.append(prompt)
         assert len({p[0]['content'] for p in prompts})==3
-    openings=[pair[1].split()[0] for pairs in EXAMPLES.values() for pair in pairs]
-    assert len(set(openings)) >= 9
 
 
 def test_optional_seed_keeps_default_unset():

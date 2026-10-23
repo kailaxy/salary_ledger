@@ -39,3 +39,10 @@ The additional grounding lexicons and explicit-negation handling are deliberatel
 - Explicit length stops now produce an incomplete-output rejection instead of an unavailable-service fallback. Explicit normal stops no longer depend on terminal punctuation. Unknown/missing reasons retain a conservative heuristic with broader Unicode endings.
 - The prior thirteen rejected replies are unavailable in the supplied export; their actual completeness cannot be established. No claim is made that all were false positives or that this patch recovers all thirteen.
 - No live Ollama inference or new laptop performance measurements were performed. The public request schema, model options, unloading request, concurrency settings and production app code remain unchanged. Normal-stop metadata is not proof of semantic or grammatical correctness.
+
+## App-aware context experiment
+
+- **196 unit tests passed**, with the unchanged single dependency deprecation warning. Added coverage verifies fixed app context, the absence of demonstration dialogues, separate untrusted user messages, distinct presets/chaos, bounded prompt size and rejection of attempted event/saveStatus request fields.
+- Only prompt construction, relevant prompt tests and documentation changed. API schemas, deterministic handling, validators, completion metadata, Ollama options/unloading, concurrency and production app remain unchanged.
+- The prompt includes app-purpose context but has no actual ledger access or trusted transaction status. All demonstration dialogues were removed to avoid supplying unrelated story details.
+- No live model quality/performance measurements were available here. Run the same 19-case, three-repeat quality benchmark against the saved preceding laptop export. Since context and examples changed together, the comparison tests the combined patch rather than attributing improvement to either change alone.
