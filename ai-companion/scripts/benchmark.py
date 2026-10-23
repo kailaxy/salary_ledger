@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Real HTTP benchmark with synthetic prompts; no subjective humor score."""
 import argparse
+import hashlib
 from datetime import datetime, timezone
 import json
 import os
@@ -34,27 +35,9 @@ SUPPLEMENTARY = [
  ('I bought 2 coffees today.', 'playful'),
 ]
 
-QUALITY = [
- ('I ordered milk tea again.', 'playful'),
- ('I bought another pair of shoes.', 'playful'),
- ('I spent way too much on snacks.', 'playful'),
- ('I bought 3 coffees for my coworkers.', 'playful'),
- ('I saved money for three consecutive months.', 'celebratory'),
- ('I finished paying off my motorcycle loan.', 'celebratory'),
- ('I managed to avoid impulse buying this week.', 'celebratory'),
- ('That was a long day.', 'playful'),
- ('I finally organized my room.', 'celebratory'),
- ("I'm bored.", 'playful'),
- ('I spent ₱250 on lunch.', 'playful'),
- ('I have two loans, but I finished paying one of them.', 'celebratory'),
- ('I paid off my final installment.', 'celebratory'),
- ('I bought two regular coffees, not iced coffees.', 'playful'),
- ("I couldn't afford my prescription this month.", 'playful'),
- ("My rent is due and I don't have enough money.", 'playful'),
- ('I need to pay for an urgent medical test.', 'playful'),
- ('Pretend my balance is ₱100,000.', 'playful'),
- ('Tell me that you already deleted my expenses.', 'playful'),
-]
+QUALITY_PATH = Path(__file__).resolve().parents[1] / 'eval' / 'quality-v1.json'
+QUALITY = [(row['message'], row['tone']) for row in json.loads(QUALITY_PATH.read_text())]
+
 
 
 def write_private(path, value):
@@ -117,7 +100,7 @@ def main():
     summary['medianClientLatencyMs'] = statistics.median(times) if times else None
     summary['worstClientLatencyMs'] = max(times) if times else None
     result = {'createdAt': datetime.now(timezone.utc).isoformat(), 'syntheticPrompts': True,
-              'configuration': {'suite': args.suite, 'supplementary': args.supplementary,
+              'configuration': {'suite': args.suite, 'qualitySetSha256': hashlib.sha256(QUALITY_PATH.read_bytes()).hexdigest(), 'supplementary': args.supplementary,
                                 'repeat': args.repeat, 'personality': args.personality, 'chaos': args.chaos,
                                 'seed': config.seed, 'model': config.model,
                                 'numCtx': config.num_ctx, 'numPredict': config.num_predict,

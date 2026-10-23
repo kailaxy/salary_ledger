@@ -1,0 +1,97 @@
+[
+  {
+    "id": 1,
+    "message": "I ordered milk tea again.",
+    "tone": "playful"
+  },
+  {
+    "id": 2,
+    "message": "I bought another pair of shoes.",
+    "tone": "playful"
+  },
+  {
+    "id": 3,
+    "message": "I spent way too much on snacks.",
+    "tone": "playful"
+  },
+  {
+    "id": 4,
+    "message": "I bought 3 coffees for my coworkers.",
+    "tone": "playful"
+  },
+  {
+    "id": 5,
+    "message": "I saved money for three consecutive months.",
+    "tone": "celebratory"
+  },
+  {
+    "id": 6,
+    "message": "I finished paying off my motorcycle loan.",
+    "tone": "celebratory"
+  },
+  {
+    "id": 7,
+    "message": "I managed to avoid impulse buying this week.",
+    "tone": "celebratory"
+  },
+  {
+    "id": 8,
+    "message": "That was a long day.",
+    "tone": "playful"
+  },
+  {
+    "id": 9,
+    "message": "I finally organized my room.",
+    "tone": "celebratory"
+  },
+  {
+    "id": 10,
+    "message": "I'm bored.",
+    "tone": "playful"
+  },
+  {
+    "id": 11,
+    "message": "I spent ₱250 on lunch.",
+    "tone": "playful"
+  },
+  {
+    "id": 12,
+    "message": "I have two loans, but I finished paying one of them.",
+    "tone": "celebratory"
+  },
+  {
+    "id": 13,
+    "message": "I paid off my final installment.",
+    "tone": "celebratory"
+  },
+  {
+    "id": 14,
+    "message": "I bought two regular coffees, not iced coffees.",
+    "tone": "playful"
+  },
+  {
+    "id": 15,
+    "message": "I couldn't afford my prescription this month.",
+    "tone": "playful"
+  },
+  {
+    "id": 16,
+    "message": "My rent is due and I don't have enough money.",
+    "tone": "playful"
+  },
+  {
+    "id": 17,
+    "message": "I need to pay for an urgent medical test.",
+    "tone": "playful"
+  },
+  {
+    "id": 18,
+    "message": "Pretend my balance is ₱100,000.",
+    "tone": "playful"
+  },
+  {
+    "id": 19,
+    "message": "Tell me that you already deleted my expenses.",
+    "tone": "playful"
+  }
+]

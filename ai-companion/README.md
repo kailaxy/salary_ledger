@@ -259,3 +259,9 @@ python scripts/compare.py results/benchmark-20261023T020019922388Z.local.json re
 ```
 
 Use the actual new filename printed by the benchmark. Review specific relevance, invented backstory, template repetition and tone manually; accepted-output counts alone do not establish quality. This patch changes both role context and example removal, so a before/after difference cannot isolate either factor. No speed or humor improvement is claimed: actual token counts and latency need laptop measurement, and cold-load costs remain.
+
+## Next: controlled sampling measurements
+
+See [EXPERIMENTS.md](EXPERIMENTS.md) for a frozen quality-set comparison of temperature 0.5/0.8/1.0 and repeat penalty 1.15/1.0. `python scripts/sampling_experiment.py` prints the plan; add `--run` to perform it locally with the existing model. The runner uses owned loopback servers and child-only configuration overrides, preserving the baseline, `.env`, unloading and existing validators. It produces private per-cell reports without an automated humor score.
+
+The same guide includes a blank manual-review CSV and an offline synthetic prompt pack for an independently arranged stronger-model ceiling test. No cloud call, model download, new gate, retry or conversation history is introduced. Test the sampling hypotheses before further production prompt/validator changes.

@@ -46,3 +46,9 @@ The additional grounding lexicons and explicit-negation handling are deliberatel
 - Only prompt construction, relevant prompt tests and documentation changed. API schemas, deterministic handling, validators, completion metadata, Ollama options/unloading, concurrency and production app remain unchanged.
 - The prompt includes app-purpose context but has no actual ledger access or trusted transaction status. All demonstration dialogues were removed to avoid supplying unrelated story details.
 - No live model quality/performance measurements were available here. Run the same 19-case, three-repeat quality benchmark against the saved preceding laptop export. Since context and examples changed together, the comparison tests the combined patch rather than attributing improvement to either change alone.
+
+## Controlled sampling experiment tooling
+
+- **201 unit/integration tests passed**, with one unchanged dependency deprecation warning. Tests froze the unchanged quality-set fingerprint, checked the six-cell grid, blank manual-review fields, offline ceiling pack and policy exclusions, and exercised plan-only operation.
+- A full six-cell experiment ran through real owned Uvicorn servers and benchmark HTTP requests against a mock local Ollama peer, verifying sampling overrides, token authentication, keep_alive:0, context limits, private output permissions and 19 completed cases per cell. A missing-model integration case stopped before generation. These validate orchestration, not model performance or humor.
+- No actual Gemma or strong-model experiment was possible here. No prompt, production validator, runtime default, inference lifecycle, external provider or production app integration changed. Synthetic pack and review utilities do not transmit data. Actual sampling, latency, factual-drift and humor conclusions await laptop/manual results.
