@@ -1,7 +1,20 @@
+from dataclasses import dataclass
 import asyncio
 import json
 import httpx
 from .config import Config
+
+
+@dataclass(frozen=True)
+class Generation:
+    reply: object
+    timings: dict[str, int]
+    completion_reason: str | None
+
+    def __iter__(self):
+        # Preserve the existing two-value client unpacking contract.
+        yield self.reply
+        yield self.timings
 
 
 class OllamaClient:
@@ -45,12 +58,11 @@ class OllamaClient:
                             **({'seed': c.seed} if c.seed is not None else {})}})
         if not isinstance(data, dict) or data.get('done') is not True or (data.get('message') or {}).get('role') != 'assistant':
             raise ValueError('Malformed Ollama response')
-        if data.get('done_reason') == 'length':
-            raise ValueError('Truncated generation')
         reply = data['message'].get('content')
         keys = ('total_duration', 'load_duration', 'prompt_eval_count', 'prompt_eval_duration', 'eval_count', 'eval_duration')
         timings = {k: data[k] for k in keys if type(data.get(k)) is int and data[k] >= 0}
-        return reply, timings
+        completion = data.get('done_reason')
+        return Generation(reply, timings, completion if completion in ('stop', 'length') else None)
 
     async def unload(self):
         try:

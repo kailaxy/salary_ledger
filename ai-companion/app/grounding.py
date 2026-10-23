@@ -23,6 +23,10 @@ def positive_mentions(text):
 def grounded(reply, message):
     out, user = canonical(reply), canonical(message)
     positive = positive_mentions(user)
+    # Repaying a loan does not establish ownership/title or the absence of
+    # other obligations. Keep this conservative rather than infer legal facts.
+    if re.search(r"\b(?:officially yours|(?:fully|completely|entirely) (?:free|yours)|(?:own|owns|owned) (?:it |the (?:bike|motorcycle|car) )?outright|(?:clear|clean) title|free and clear)\b", out):
+        return False
     # Broader financial status is not established by paying a particular loan.
     if re.search(r'\b(?:debt[ -]?free|free (?:of|from) (?:all )?debt|(?:zero|0|no) (?:remaining |more )?debts?|all (?:your )?debts? (?:is |are )?(?:gone|paid)|perfect credit|credit score)\b', out):
         return False

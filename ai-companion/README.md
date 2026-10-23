@@ -223,3 +223,11 @@ source .venv/bin/activate
 ```
 
 In another activated terminal in `ai-companion`, run `python scripts/benchmark.py --suite quality --repeat 3 --markdown`. Inspect `validationRejections`, generated openings and actual replies; repeated “Seriously?” responses may still require further prompt tuning. Compare matched runs with the existing comparison utility.
+
+## Completion and ownership follow-up patch
+
+Output completion now uses Ollama metadata when available: `done:true` with `done_reason:stop` does not require final punctuation, while `done_reason:length` always returns an `invalid_output` fallback with `validationReason:incomplete_output`, even if the text happens to end with punctuation. The client's existing `keep_alive:0` request remains unchanged. A completed length stop does not trigger a retry or get mislabeled as an unavailable service; its token/timing counters are retained.
+
+For older Ollama versions that omit the reason, a conservative ending heuristic remains. It now handles closing quotes/format markers, Unicode symbol/emoji endings, variation selectors and skin-tone modifiers rather than a short emoji whitelist. `incomplete_output` on that legacy path is a heuristic label, not proof of truncation. Neither a stop reason nor punctuation guarantees grammatical or factual correctness; all other content checks still run. Previous exports lack the rejected text, so the thirteen earlier ending rejections cannot be retrospectively classified as true or false positives.
+
+Narrow checks also reject the observed dismissive “that's just...sad”/“hear about my day” responses and unsupported ownership/absolute-status phrases such as “officially yours,” “completely free,” “own it outright” and “clean title.” A loan repayment establishes neither legal title nor the absence of other obligations. These remain limited pattern checks, with possible missed paraphrases and conservative false positives. No further personality rewrite or conversation storage was introduced.

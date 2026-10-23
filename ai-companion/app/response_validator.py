@@ -15,7 +15,19 @@ class ValidationResult:
     reason: str | None = None
 
 
-def check_response(text, user_message):
+def has_natural_ending(reply):
+    # Older Ollama versions may omit done_reason. Allow closing quotes and
+    # Unicode symbol/emoji endings, including variation selectors and skin tones.
+    end = reply.rstrip('\"\'”’)]}*_')
+    while end and (unicodedata.category(end[-1]) in ('Mn', 'Me')
+                   or '\U0001f3fb' <= end[-1] <= '\U0001f3ff'):
+        end = end[:-1]
+    return bool(end) and (end[-1] in '.!?…' or unicodedata.category(end[-1]) == 'So')
+
+
+def check_response(text, user_message, *, completion_reason=None):
+    if completion_reason == 'length':
+        return ValidationResult(None, 'incomplete_output')
     if not isinstance(text, str):
         return ValidationResult(None, 'malformed_output')
     reply = normalize(text)
@@ -25,6 +37,8 @@ def check_response(text, user_message):
         return ValidationResult(None, 'malformed_output')
     lower = reply.lower().replace('’', "'")
     if re.search(r"\b(?:that's |that is |it's |it is )?(?:a |your )?(?:ledger[ -]sized )?problem for you to solve\b|\b(?:nobody cares|stop whining|get over it|deal with it yourself)\b", lower):
+        return ValidationResult(None, 'dismissive_text')
+    if re.search(r"\b(?:that's|that is|you're|you are)\s+(?:just\s*)?(?:[.\s…–—-]+)?sad\b|\b(?:want to|wanna) hear about my day\b", lower):
         return ValidationResult(None, 'dismissive_text')
     if re.search(r'\b(system|assistant|user)\s*:|system prompt|ignore.*instructions|toneinstructions', lower):
         return ValidationResult(None, 'instruction_leak')
@@ -61,8 +75,8 @@ def check_response(text, user_message):
     phrases = [tuple(words[i:i+3]) for i in range(len(words)-2)]
     if len(phrases) != len(set(phrases)):
         return ValidationResult(None, 'repetition')
-    if reply[-1] not in '.!?…💕😭😂🙂😊🎉❤':
-        return ValidationResult(None, 'incomplete_output')  # output-cap truncation is common; avoid returning fragments
+    if completion_reason != 'stop' and not has_natural_ending(reply):
+        return ValidationResult(None, 'incomplete_output')  # conservative legacy fallback, not proof of truncation
     return ValidationResult(reply)
 
 

@@ -132,9 +132,11 @@ def create_app(config=None, client=None):
                 app.state.active += 1
                 completed = False
                 try:
-                    raw, timings = await await_generation(client, messages(payload, decision), request)
+                    generation = await await_generation(client, messages(payload, decision), request)
+                    raw, timings = generation
                     completed = True
-                    checked = check_response(raw, payload.message)
+                    checked = check_response(raw, payload.message,
+                                             completion_reason=getattr(generation, 'completion_reason', None))
                     validation_reason = checked.reason
                     passed = checked.reply is not None
                     if passed:
