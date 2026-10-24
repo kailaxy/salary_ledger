@@ -16,13 +16,6 @@ if (!(buildNumber ==~ /[0-9]+/) || buildNumber.toLong() < 3 || buildNumber.toLon
     throw new GradleException('LEDGER_VERSION_CODE must be an integer from 3 to 2100000000')
 }
 
-def ledgerUrl = providers.environmentVariable('LEDGER_WEB_APP_URL').orElse('').get().trim()
-if (!ledgerUrl) {
-    ledgerUrl = 'https://script.google.com/macros/s/AKfycbz0-dfJkKtvFhAAGehlzw6kaIqjKPUqpjgmaRO0ZqBLrk3PgvTNv23SSyklYUARnbov/exec'
-}
-if (ledgerUrl && !(ledgerUrl ==~ /https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec/)) {
-    throw new GradleException('LEDGER_WEB_APP_URL must be an HTTPS script.google.com/macros/s/.../exec deployment URL')
-}
 android {
     namespace 'com.kailaxy.salaryledger'
     compileSdk 35
@@ -33,7 +26,6 @@ android {
         versionCode buildNumber.toInteger()
         versionName '0.4.0'
         resValue 'string', 'app_name', 'Salary Ledger'
-        buildConfigField 'String', 'LEDGER_WEB_APP_URL', '"' + ledgerUrl + '"'
     }
     buildFeatures { buildConfig true }
     signingConfigs {

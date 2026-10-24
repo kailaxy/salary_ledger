@@ -38,6 +38,24 @@ final class DeviceCredentials {
         cipher.init(Cipher.DECRYPT_MODE, key(), new GCMParameterSpec(128, Base64.decode(envelope.getString("iv"), Base64.NO_WRAP)));
         return new JSONObject(new String(cipher.doFinal(Base64.decode(envelope.getString("data"), Base64.NO_WRAP)), StandardCharsets.UTF_8));
     }
+    String deploymentUrl() throws Exception {
+        String configured = preferences.getString("deploymentUrl", null);
+        JSONObject stored;
+        try { stored = read(); }
+        catch (Exception error) {
+            // Keep a configured destination available for explicit re-pairing
+            // after Keystore failure; never clear the identity or pending data.
+            if (configured != null) return DeploymentPolicy.normalize(configured);
+            throw error;
+        }
+        String selected = DeploymentPolicy.select(configured, stored == null ? null : stored.optString("deploymentUrl"));
+        if (selected != null && !selected.equals(configured)) setDeploymentUrl(selected);
+        return selected;
+    }
+    void setDeploymentUrl(String url) throws Exception {
+        String selected = DeploymentPolicy.normalize(url);
+        if (!preferences.edit().putString("deploymentUrl", selected).commit()) throw new Exception("DEVICE_STORAGE_ERROR");
+    }
     String ledgerIdentity() { return preferences.getString("ledgerIdentity", null); }
     private JSONObject seal(JSONObject credentials) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
@@ -57,6 +75,7 @@ final class DeviceCredentials {
             envelope = seal(credentials);
         }
         if (!preferences.edit().putString("sealed", envelope.toString())
-                .putString("ledgerIdentity", credentials.getString("ledgerId")).commit()) throw new Exception("DEVICE_STORAGE_ERROR");
+                .putString("ledgerIdentity", credentials.getString("ledgerId"))
+                .putString("deploymentUrl", DeploymentPolicy.normalize(credentials.getString("deploymentUrl"))).commit()) throw new Exception("DEVICE_STORAGE_ERROR");
     }
 }

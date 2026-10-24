@@ -41,9 +41,11 @@ public final class MainActivity extends Activity {
     private LinearLayout gate;
     private TextView gateText;
     private Button unlockButton;
+    private EditText deploymentInput;
+    private String deploymentUrl;
     private DeviceCredentials credentials;
     private ScriptTransport transport;
-    private boolean authorized, unlocking, loaded, destroyed, bridgeSupported;
+    private boolean authorized, unlocking, loaded, destroyed, bridgeSupported, pairingOffered;
     private AlertDialog pairingDialog;
     private final java.util.List<Runnable> deferredReplies = new java.util.ArrayList<>();
 
@@ -57,7 +59,9 @@ public final class MainActivity extends Activity {
                     | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
         }
         credentials = new DeviceCredentials(this);
-        transport = new ScriptTransport(BuildConfig.LEDGER_WEB_APP_URL);
+        try { deploymentUrl = credentials.deploymentUrl(); }
+        catch (Exception error) { deploymentUrl = null; }
+        if (deploymentUrl != null) transport = new ScriptTransport(deploymentUrl);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setOnApplyWindowInsetsListener((view, insets) -> {
@@ -73,6 +77,12 @@ public final class MainActivity extends Activity {
         gateText = new TextView(this);
         gateText.setText("Unlock your device to open Salary Ledger.");
         gate.addView(gateText);
+        deploymentInput = new EditText(this);
+        deploymentInput.setHint("https://script.google.com/macros/s/…/exec");
+        deploymentInput.setContentDescription("Your Apps Script deployment URL");
+        deploymentInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        deploymentInput.setSingleLine(true);
+        gate.addView(deploymentInput);
         unlockButton = new Button(this);
         unlockButton.setText("Unlock ledger");
         unlockButton.setOnClickListener(v -> unlock());
@@ -82,6 +92,7 @@ public final class MainActivity extends Activity {
         webView.setVisibility(View.GONE);
         root.addView(webView, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(root);
+        updateConnectionGate();
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
@@ -95,6 +106,14 @@ public final class MainActivity extends Activity {
         WebViewAssetLoader loader = new WebViewAssetLoader.Builder()
                 .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this)).build();
         webView.setWebViewClient(new WebViewClientCompat() {
+            @Override public void onPageFinished(WebView view, String url) {
+                if (authorized && trustedPage(Uri.parse(url)) && !pairingOffered && credentials.ledgerIdentity() == null) {
+                    pairingOffered = true;
+                    // Use the existing origin-restricted pairing flow and its
+                    // download callback once the packaged page is ready.
+                    view.evaluateJavascript("document.getElementById('connectDeviceBtn').click();", null);
+                }
+            }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 return !trustedPage(request.getUrl());
             }
@@ -148,7 +167,7 @@ public final class MainActivity extends Activity {
                 try {
                     JSONObject stored = credentials.read();
                     if (stored == null) throw new ScriptTransport.Failure("DEVICE_UNPAIRED");
-                    if (!BuildConfig.LEDGER_WEB_APP_URL.equals(stored.optString("deploymentUrl"))) throw new ScriptTransport.Failure("DEVICE_REVOKED");
+                    if (deploymentUrl == null || !deploymentUrl.equals(stored.optString("deploymentUrl"))) throw new ScriptTransport.Failure("DEVICE_REVOKED");
                     Object result = transport.rpc(stored, request.getString("method"), request.getJSONArray("args"));
                     respond(reply, requestId, result, null);
                 } catch (Exception error) { respond(reply, requestId, null, publicError(error)); }
@@ -190,6 +209,15 @@ public final class MainActivity extends Activity {
         TextView help = new TextView(this);
         help.setText("In your Google Sheet, choose Salary Ledger → Pair Android device. Enter the one-time code and your existing ledger PIN. These stay out of the web page.");
         form.addView(help);
+        EditText endpoint = new EditText(this);
+        endpoint.setHint("Your Apps Script /exec URL");
+        endpoint.setContentDescription("Your Apps Script deployment URL");
+        endpoint.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        endpoint.setSingleLine(true); endpoint.setText(deploymentUrl);
+        // Before first pairing a mistyped URL can be corrected. Paired devices
+        // stay pinned to their ledger; switching/clearing pending data is separate.
+        endpoint.setEnabled(credentials.ledgerIdentity() == null);
+        form.addView(endpoint);
         EditText code = new EditText(this);
         code.setHint("One-time pairing code");
         code.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
@@ -209,6 +237,9 @@ public final class MainActivity extends Activity {
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             String enteredCode = code.getText().toString().replaceAll("\\s", "").toLowerCase(java.util.Locale.ROOT);
             String enteredPin = pin.getText().toString();
+            final String enteredUrl;
+            try { enteredUrl = DeploymentPolicy.normalize(endpoint.getText().toString()); }
+            catch (IllegalArgumentException error) { errorText.setText("Enter your HTTPS script.google.com/macros/s/…/exec URL without extra parameters."); return; }
             if (!enteredCode.matches("[a-f0-9]{64}") || !enteredPin.matches("[0-9]{6,12}")) {
                 errorText.setText("Enter the complete pairing code and a 6–12 digit PIN."); return;
             }
@@ -217,13 +248,13 @@ public final class MainActivity extends Activity {
             try {
                 network.execute(() -> {
                     try {
-                        JSONObject issued = transport.pair(enteredCode, enteredPin, android.os.Build.MODEL.substring(0, Math.min(60, android.os.Build.MODEL.length())));
+                        JSONObject issued = new ScriptTransport(enteredUrl).pair(enteredCode, enteredPin, android.os.Build.MODEL.substring(0, Math.min(60, android.os.Build.MODEL.length())));
                         String oldLedger = credentials.ledgerIdentity();
                         if (oldLedger != null && !oldLedger.equals(issued.getString("ledgerId")))
                             throw new ScriptTransport.Failure("PAIR_WRONG_LEDGER");
-                        issued.put("deploymentUrl", BuildConfig.LEDGER_WEB_APP_URL);
+                        issued.put("deploymentUrl", enteredUrl);
                         credentials.save(issued);
-                        runOnUiThread(() -> { code.setText(""); pin.setText(""); if (!destroyed) dialog.dismiss(); });
+                        runOnUiThread(() -> { code.setText(""); pin.setText(""); if (!destroyed) { deploymentUrl = enteredUrl; transport = new ScriptTransport(enteredUrl); dialog.dismiss(); } });
                         respond(reply, id, new JSONObject().put("paired", true), null);
                     } catch (Exception error) {
                         runOnUiThread(() -> {
@@ -240,8 +271,28 @@ public final class MainActivity extends Activity {
             }
         });
     }
+    private void updateConnectionGate() {
+        boolean setup = deploymentUrl == null;
+        deploymentInput.setVisibility(setup ? View.VISIBLE : View.GONE);
+        gateText.setText(setup
+                ? "Set up your ledger\n\nPaste the web app /exec URL from your own Google Sheet’s Apps Script deployment. Set your ledger PIN in that Sheet, then generate a one-time pairing code."
+                : "Unlock your device to open Salary Ledger.");
+        unlockButton.setText(setup ? "Continue" : "Unlock ledger");
+        unlockButton.setOnClickListener(v -> {
+            if (deploymentUrl == null) {
+                try {
+                    String selected = DeploymentPolicy.normalize(deploymentInput.getText().toString());
+                    credentials.setDeploymentUrl(selected);
+                    deploymentUrl = selected; transport = new ScriptTransport(selected);
+                    updateConnectionGate(); unlock();
+                } catch (Exception error) {
+                    deploymentInput.setError("Enter your HTTPS script.google.com/macros/s/…/exec URL without extra parameters.");
+                }
+            } else unlock();
+        });
+    }
     private void unlock() {
-        if (!bridgeSupported || unlocking || destroyed) return;
+        if (!bridgeSupported || unlocking || destroyed || deploymentUrl == null) return;
         KeyguardManager keyguard = (KeyguardManager) getSystemService(KEYGUARD_SERVICE);
         if (!keyguard.isDeviceSecure()) {
             gateText.setText("Set a device screen lock to protect your saved financial records, then return here.");
