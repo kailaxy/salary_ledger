@@ -22,7 +22,7 @@ module.exports=async function personalityChecks({page,native,snapshot}){
  // Offline cold page reopening restores preferences alongside the existing local snapshot.
  await page.evaluate(()=>{sessionStorage.setItem('assistantOffline','1');window.__online=false;dispatchEvent(new Event('offline'));});await page.reload();await page.waitForFunction(()=>document.querySelector('#assistantSource').textContent.includes('Updated'));
  await open();assert.equal(await page.locator('#personalityPreset').inputValue(),'financial-gremlin');assert.equal(await page.locator('#personalityChaos').inputValue(),'100');await page.locator('#setClose').click();answer=await ask('fund balances');assert.match(await answer.innerText(),/80\.00/);assert.match(await answer.locator('.assistant-intro').innerText(),/GOBLINS|CAPE/);
- await page.locator('#tab-funds').click();await page.locator('#tab-home').click();await open();assert.equal(await page.locator('#personalityPreset').inputValue(),'financial-gremlin');
+ await page.locator('#tab-more').click();await page.locator('#tab-funds').click();await page.locator('#tab-home').click();await open();assert.equal(await page.locator('#personalityPreset').inputValue(),'financial-gremlin');
  // A server refresh and ledger identity switch must not transfer personalization or old chat text.
  await page.locator('#setClose').click();await page.evaluate(()=>{sessionStorage.removeItem('assistantOffline');window.__online=true;dispatchEvent(new Event('online'));});await page.waitForFunction(()=>!document.querySelector('#refresh').classList.contains('spin'));
  await open();assert.equal(await page.locator('#personalityChaos').inputValue(),'100');await page.locator('#setClose').click();

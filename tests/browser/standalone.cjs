@@ -8,7 +8,7 @@ async function confirm(page){await page.locator('#reviewConfirm').click();}
  server.put('BUDGET_LINES',{line_id:'line_food',period_id:'per_test',category_id:'cat_food',planned_amount:1000});
  const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||(fs.existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/usr/bin/google-chrome'),args:['--no-sandbox']});
  let page;try{
- page=await browser.newPage({viewport:{width:393,height:852}});page.setDefaultTimeout(10000);const errors=[];page.on('pageerror',e=>errors.push(e.message));let lost=false;
+ page=await browser.newPage({viewport:{width:393,height:852}});await page.clock.setFixedTime(new Date('2026-10-22T12:00:00Z'));page.setDefaultTimeout(10000);const errors=[];page.on('pageerror',e=>errors.push(e.message));let lost=false;
  await page.exposeFunction('testRPC',async(method,args)=>{if(native)args=['123456',...args];if(!['getLedgerSnapshot','syncOperation','syncLedgerMutation','syncLoanPayment'].includes(method))throw Error('Unexpected method '+method);const r=server.ctx[method](...args);if(method==='syncOperation'&&lost){lost=false;throw Error('Simulated lost operation reply');}return JSON.parse(JSON.stringify(r));});
  await page.addInitScript(({native})=>{
   if(!native)localStorage.setItem('sl2_pin','123456');Object.defineProperty(navigator,'onLine',{get:()=>sessionStorage.getItem('offline')!=='1'});
