@@ -17,6 +17,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.ProgressBar;
 import androidx.webkit.JavaScriptReplyProxy;
 import androidx.webkit.WebViewAssetLoader;
 import androidx.webkit.WebViewClientCompat;
@@ -41,11 +42,12 @@ public final class MainActivity extends Activity {
     private LinearLayout gate;
     private TextView gateText;
     private Button unlockButton;
+    private ProgressBar gateProgress;
     private EditText deploymentInput;
     private String deploymentUrl;
     private DeviceCredentials credentials;
     private ScriptTransport transport;
-    private boolean authorized, unlocking, loaded, destroyed, bridgeSupported, pairingOffered;
+    private boolean authorized, unlocking, loaded, destroyed, bridgeSupported, pairingOffered, pageReady;
     private AlertDialog pairingDialog;
     private final java.util.List<Runnable> deferredReplies = new java.util.ArrayList<>();
 
@@ -75,8 +77,16 @@ public final class MainActivity extends Activity {
         int padding = (int) (24 * getResources().getDisplayMetrics().density);
         gate.setPadding(padding, padding, padding, padding);
         gateText = new TextView(this);
+        gateText.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         gateText.setText("Unlock your device to open Salary Ledger.");
         gate.addView(gateText);
+        gateProgress = new ProgressBar(this);
+        gateProgress.setContentDescription("Opening your ledger");
+        gateProgress.setVisibility(View.GONE);
+        int spinnerSize = (int) (32 * getResources().getDisplayMetrics().density);
+        LinearLayout.LayoutParams spinnerLayout = new LinearLayout.LayoutParams(spinnerSize, spinnerSize);
+        spinnerLayout.topMargin = spinnerLayout.bottomMargin = padding / 2;
+        gate.addView(gateProgress, spinnerLayout);
         deploymentInput = new EditText(this);
         deploymentInput.setHint("https://script.google.com/macros/s/…/exec");
         deploymentInput.setContentDescription("Your Apps Script deployment URL");
@@ -107,6 +117,9 @@ public final class MainActivity extends Activity {
                 .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this)).build();
         webView.setWebViewClient(new WebViewClientCompat() {
             @Override public void onPageFinished(WebView view, String url) {
+                if (!trustedPage(Uri.parse(url))) return;
+                pageReady = true;
+                if (authorized) showLedger();
                 if (authorized && trustedPage(Uri.parse(url)) && !pairingOffered && credentials.ledgerIdentity() == null) {
                     pairingOffered = true;
                     // Use the existing origin-restricted pairing flow and its
@@ -227,6 +240,8 @@ public final class MainActivity extends Activity {
         pin.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
         pin.setSingleLine(true); pin.setSaveEnabled(false); form.addView(pin);
         TextView errorText = new TextView(this); form.addView(errorText);
+        ProgressBar connecting = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        connecting.setIndeterminate(true); connecting.setVisibility(View.GONE);form.addView(connecting);
         pairingDialog = new AlertDialog.Builder(this).setTitle("Connect this device")
                 .setView(form).setNegativeButton("Cancel", (dialog, which) -> respond(reply, id, null, "PAIR_CANCELLED"))
                 .setPositiveButton("Connect", null).create();
@@ -244,7 +259,7 @@ public final class MainActivity extends Activity {
                 errorText.setText("Enter the complete pairing code and a 6–12 digit PIN."); return;
             }
             dialog.setCancelable(false); dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
-            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setEnabled(false); errorText.setText("Connecting…");
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setEnabled(false); errorText.setText("Connecting to your ledger…");connecting.setVisibility(View.VISIBLE);
             try {
                 network.execute(() -> {
                     try {
@@ -261,13 +276,13 @@ public final class MainActivity extends Activity {
                             if (destroyed) return;
                             dialog.setCancelable(true); dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true);
                             dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setEnabled(true);
-                            errorText.setText(pairingError(error));
+                            connecting.setVisibility(View.GONE);errorText.setText(pairingError(error));
                         });
                     }
                 });
             } catch (java.util.concurrent.RejectedExecutionException error) {
                 dialog.setCancelable(true); dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true);
-                dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setEnabled(true); errorText.setText("Sync is busy. Try again.");
+                dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setEnabled(true); connecting.setVisibility(View.GONE);errorText.setText("Sync is busy. Try again.");
             }
         });
     }
@@ -303,17 +318,30 @@ public final class MainActivity extends Activity {
         unlockButton.setOnClickListener(v -> unlock());
         Intent intent = keyguard.createConfirmDeviceCredentialIntent("Salary Ledger", "Unlock your saved ledger");
         if (intent == null) return;
-        unlocking = true; startActivityForResult(intent, UNLOCK);
+        unlocking = true; gateProgress.setVisibility(View.VISIBLE);unlockButton.setEnabled(false);
+        gateText.setText("Waiting for device unlock…");
+        startActivityForResult(intent, UNLOCK);
+    }
+    private void showLedger() {
+        unlockButton.setEnabled(true);gateProgress.setVisibility(View.GONE);gate.setVisibility(View.GONE);
+        webView.setVisibility(View.VISIBLE);webView.onResume();
+        boolean animate = Settings.Global.getFloat(getContentResolver(), Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0;
+        webView.animate().cancel();webView.setAlpha(animate ? 0f : 1f);
+        if (animate) webView.animate().alpha(1f).setDuration(180).start();
     }
     @Override protected void onStart() { super.onStart(); if (!authorized && !unlocking) unlock(); }
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == UNLOCK) {
             unlocking = false; authorized = resultCode == RESULT_OK;
+            unlockButton.setEnabled(true);gateProgress.setVisibility(View.GONE);
+            updateConnectionGate();
             if (authorized) {
-                gate.setVisibility(View.GONE); webView.setVisibility(View.VISIBLE); webView.onResume();
-                if (!loaded) { loaded = true; webView.loadUrl(PAGE); }
-                else webView.evaluateJavascript("window.dispatchEvent(new Event('ledgerresume'));", null);
+                if (!loaded) {
+                    gateProgress.setVisibility(View.VISIBLE);gateText.setText("Opening your ledger…");
+                    unlockButton.setEnabled(false);loaded = true;webView.onResume();webView.loadUrl(PAGE);
+                } else if (!pageReady) { unlockButton.setEnabled(false);gateProgress.setVisibility(View.VISIBLE);gateText.setText("Opening your ledger…"); }
+                else { showLedger();webView.evaluateJavascript("window.dispatchEvent(new Event('ledgerresume'));", null); }
                 java.util.List<Runnable> replies = new java.util.ArrayList<>(deferredReplies);
                 deferredReplies.clear(); for (Runnable reply : replies) reply.run();
             }
@@ -321,7 +349,7 @@ public final class MainActivity extends Activity {
     }
     @Override protected void onPause() {
         super.onPause(); authorized = false;
-        if (webView != null) { webView.setVisibility(View.GONE); webView.onPause(); }
+        if (webView != null) { webView.animate().cancel();webView.setVisibility(View.GONE); webView.onPause(); }
         if (gate != null) gate.setVisibility(View.VISIBLE);
     }
     @Override public void onBackPressed() {

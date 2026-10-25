@@ -305,6 +305,20 @@
   .more-tab[aria-selected="true"]{ background:var(--card); border-color:var(--rule-strong); color:var(--ink); font-weight:700; box-shadow:0 1px 3px #00000008; }
   .more-tab:focus-visible{ outline:2px solid var(--ink); outline-offset:2px; }
 
+  /* Short, non-blocking feedback; reduced-motion overrides these below. */
+  button{ transition:background-color .16s ease,color .16s ease,border-color .16s ease,opacity .16s ease,transform .12s ease; }
+  button:active:not(:disabled){ transform:scale(.97); }
+  .modal:not([hidden]){ animation:veil-in .18s ease both; }
+  .modal:not([hidden]) .sheet{ animation:sheet-in .24s cubic-bezier(.2,.8,.2,1) both; }
+  .toast:not([hidden]){ animation:rise .18s ease both; }
+  .assistant-answer,.settings-section[open] .settings-section-body{ animation:rise .2s ease both; }
+  .is-busy::before{ content:''; display:inline-block; width:14px; height:14px; margin-right:9px; vertical-align:-2px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:spin .75s linear infinite; }
+  .activity{ position:absolute; z-index:25; left:16px; right:16px; bottom:calc(var(--nav-h) + env(safe-area-inset-bottom,0px) + 12px); margin:0; padding:10px 14px; border:1px solid var(--rule-strong); border-radius:10px; color:var(--ink-soft); font-size:12px; background:var(--card); box-shadow:0 4px 16px #0000000d; pointer-events:none; animation:rise .18s ease both; }
+  .activity[hidden]{ display:none; }
+  .activity::before{ content:''; display:inline-block; width:10px; height:10px; margin-right:8px; border:2px solid var(--rule-strong); border-top-color:var(--ink); border-radius:50%; animation:spin .75s linear infinite; vertical-align:-2px; }
+  @keyframes veil-in{ from{background:transparent;} }
+  @keyframes sheet-in{ from{opacity:0;transform:translateY(20px);} to{opacity:1;transform:none;} }
+
   /* ---------- PIN screen ---------- */
   .lock{
     position:absolute; inset:0; z-index:10; background:var(--paper);
@@ -369,7 +383,8 @@
   .del.armed{ border-color:var(--stamp); background:var(--stamp); color:#fff; }
 
   @media (prefers-reduced-motion:reduce){
-    *{ animation:none !important; transition:none !important; }
+    * ,*::before,*::after{ animation:none !important; transition:none !important; }
+    button:active:not(:disabled){transform:none;}
   }
 
   .toast{
@@ -560,6 +575,7 @@
     </div>
   </header>
 
+  <p class="activity" id="activityStatus" role="status" aria-live="polite" hidden></p>
   <p class="banner" id="banner" role="status" hidden></p>
 
   <main id="main">
@@ -759,7 +775,7 @@
     <p>Enter your PIN to open the app.</p>
     <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" aria-label="PIN" maxlength="12">
     <p class="err" id="pinErr" role="alert"></p>
-    <button class="go" type="submit">Unlock</button>
+    <button class="go" id="pinUnlock" type="submit">Unlock</button>
   </form>
 </div>
 
@@ -1967,7 +1983,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
   /* one write: done(result|null, errorText) */
   function mutate(fn,args,done){
     if(saving)return;
-    saving=true;
+    saving=true;if($('#addGo')&&data&&data.setupDone)fillAdd();
     saveOperation(fn,args).then(function(res){saving=false;if(done)done(res,'');fillAdd();},function(error){saving=false;if(done)done(null,error.message);else toast(error.message,true);fillAdd();});
   }
 
@@ -2623,7 +2639,8 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
     }
     var nb = $('#addNeed'); nb.hidden = !need; nb.textContent = need;
     $('#addGo').disabled = !!need || saving;
-    $('#addGo').textContent = editDraft ? 'Review changes' : 'Review entry';
+    $('#addGo').textContent = saving ? 'Working…' : editDraft ? 'Review changes' : 'Review entry';
+    $('#addGo').classList.toggle('is-busy',saving);$('#addGo').setAttribute('aria-busy',saving?'true':'false');
     $('#cancelEditBtn').hidden = !editDraft;
     $('#fDir').disabled=!!editDraft;$('#fLoan').disabled=!!editDraft;
     $$('#addForm .seg-btn').forEach(function(b){b.disabled=!!editDraft || saving;});
@@ -2693,7 +2710,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
     else if (t === 'Income') { fn = 'addIncome'; rec = Object.assign(base, { kind: $('#fKind').value, source: $('#fSource').value }); label = $('#fSource').value.trim() || 'Income'; }
     else { fn = 'addLoanPayment'; rec = Object.assign(base, { loanId: $('#fLoan').value, alsoSpend: !$('#wAlso').hidden && $('#fAlso').checked, categoryId: $('#fCat').value }); label = (byId(data.loans, rec.loanId) || {}).name; }
     if(editDraft&&(t==='Fund'||t==='Loan'||(t==='Expense'&&cloudSnapshot.capabilities.operationSyncVersion===1))){var editing={table:editDraft.table,id:editDraft.id,date:rec.date,amount:rec.amount,note:rec.note,periodId:rec.periodId,categoryId:rec.categoryId};if(t==='Loan')editing.alsoSpend=rec.alsoSpend;mutate('editRecord',[editing],function(res,err){if(err){setMsg('addMsg',err,'err');return;}editDraft=null;$('#fAmount').value='';$('#fNote').value='';if(ledgerSnapshot&&ledgerSnapshot.capabilities.optionalPlanningVersion===1){$('#fPeriod').value='';if(addType==='Expense')$('#fCat').value='';}fillAdd();setMsg('addMsg','Changes saved on this device.','ok');if(calendarEditor)closeCalendarEditor(true);});return;}
-    saving=true;$('#addGo').disabled=true;
+    saving=true;fillAdd();
     (t==='Loan'?submitLoanLocal(rec):submitLocal(t,rec)).catch(function(error){setMsg('addMsg',error.message,'err');}).finally(function(){saving=false;fillAdd();});
 
   }
@@ -2829,6 +2846,8 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
   function load(){
     if (busy) return Promise.resolve();
     busy = true; syncRequested=false; $('#refresh').classList.add('spin');
+    $('#refresh').setAttribute('aria-busy','true');$('#activityStatus').hidden=false;$('#activityStatus').textContent=!$('#lock').hidden?'Unlocking your ledger…':'Refreshing your ledger…';
+    if(!$('#lock').hidden){$('#pinUnlock').disabled=true;$('#pinUnlock').classList.add('is-busy');$('#pinUnlock').textContent='Unlocking…';$('#lock').setAttribute('aria-busy','true');$('#pin').disabled=true;}
     setLocalStatus('Synchronizing saved changes and refreshing ledger…');
     return drainQueue().then(function(){
       if(navigator.onLine===false)throw new Error('Device is offline.');
@@ -2853,7 +2872,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
       else if (/PIN_NOT_SET/.test(m)) showBanner('Set a PIN in the sheet before downloading a complete local ledger.');
       else showBanner(data ? 'Could not refresh. Showing saved records, including pending local changes.' : 'Could not load your sheet. ' + m);
       renderPending();
-    }).finally(function(){busy=false;$('#refresh').classList.remove('spin');if(syncRequested){syncRequested=false;setTimeout(load,0);}});
+    }).finally(function(){busy=false;$('#refresh').classList.remove('spin');$('#refresh').setAttribute('aria-busy','false');$('#activityStatus').hidden=true;$('#pinUnlock').disabled=false;$('#pinUnlock').classList.remove('is-busy');$('#pinUnlock').textContent='Unlock';$('#lock').setAttribute('aria-busy','false');$('#pin').disabled=false;if(syncRequested){syncRequested=false;setTimeout(load,0);}});
   }
 
   /* ---------- events ---------- */
@@ -2864,7 +2883,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
     if (!t) return;
     if (t.hasAttribute('data-tab')) { showTab(t.getAttribute('data-tab')); return; }
     var act = t.getAttribute('data-act'), id = t.getAttribute('data-id');
-    if(act==='connectdevice'){var connect=$('#connectDeviceBtn');connect.disabled=true;LedgerNative.pair().then(function(){toast('Device connected. Downloading your ledger…');return load();}).catch(function(error){if(!/PAIR_CANCELLED/.test(error.message))toast(error.message,true);}).finally(function(){connect.disabled=false;});}
+    if(act==='connectdevice'){var connect=$('#connectDeviceBtn');connect.disabled=true;connect.classList.add('is-busy');connect.textContent='Connecting…';LedgerNative.pair().then(function(){toast('Device connected. Downloading your ledger…');return load();}).catch(function(error){if(!/PAIR_CANCELLED/.test(error.message))toast(error.message,true);}).finally(function(){connect.disabled=false;connect.classList.remove('is-busy');connect.textContent='Connect this device';});}
     else if(act==='caldate')selectCalendarDate(t.getAttribute('data-date'),true);
     else if(act==='calprev')moveCalendarMonth(-1);
     else if(act==='calnext')moveCalendarMonth(1);
@@ -2965,6 +2984,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
   $('#lock').addEventListener('submit', function(e){
     e.preventDefault(); if(nativeMode)return;
     var v = $('#pin').value.trim();
+    if(busy)return;
     if (!v) { $('#pinErr').textContent = 'Type your PIN first.'; return; }
     pin = v; store.set('sl2_pin', v); $('#pinErr').textContent = ''; load();
   });
