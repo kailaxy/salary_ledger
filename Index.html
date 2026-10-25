@@ -434,6 +434,8 @@
   }
   .modal[hidden]{ display:none; }
   #entryReview{z-index:50;}
+  #entityModal .card{ margin:0; padding:0; border:0; background:none; }
+  #entityModal form > .label:first-child{display:none;}
   #recordEditBody .card{ margin:0; padding:0; border:0; background:none; }
   #recordEditBody .seg-ctl{ display:none; }
   #recordEditBody #cancelEditBtn{ margin-top:10px; width:100%; }
@@ -623,6 +625,13 @@
     </button>
   </nav>
 
+  <div class="modal" id="entityModal" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="entityTitle">
+      <div class="sheet-head"><h2 id="entityTitle">Create</h2><button class="icon-btn" id="entityClose" type="button" aria-label="Close editor">✕</button></div>
+      <div id="catBox"></div><div id="loanFormBox"></div>
+    </div>
+  </div>
+
   <div class="modal" id="recordEditModal" hidden>
     <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="recordEditTitle">
       <div class="sheet-head"><h2 id="recordEditTitle">Edit record</h2><button class="icon-btn" id="recordEditClose" type="button" aria-label="Close record editor">✕</button></div>
@@ -747,7 +756,7 @@
           <p>Personality adds tone around the same verified amounts, dates, explanations and warnings. Overdue debt, shortfalls and missing information always receive gentle responses. No AI model or download is involved.</p>
           <h4>Refresh (arrow icon)</h4>
           <p>Synchronizes confirmed changes and downloads the latest cloud copy. Home shows retries and conflicts. Review current cloud values before discarding a proposal; related pending changes may also need review.</p>
-          <h3>Finding plans, funds and loans</h3><p>Open More in the bottom navigation, then choose Plans, Funds or Loans. More remembers the last sub-tab you used.</p>
+          <h3>Finding plans, funds and loans</h3><p>Open More in the bottom navigation, then choose Plans, Funds or Loans. More remembers the last sub-tab you used. New and edited categories, funds and loans open in modal editors; review changes before confirming. Cancel closes the editor without saving.</p>
           <h3>Records calendar</h3><p>Open Records in the bottom navigation. Dots mark dates with saved or non-conflicting pending records. Choose a date to see that day’s income, expenses, fund movements and loan payments; tap a record to edit it in a modal without leaving the calendar. Category and plan assignment remain optional for expenses, and every change uses the existing review and confirmation. A loan payment and its linked expense appear once. Use the month arrows, Today or Go to date to browse.</p>
           <p>Settings sections expand and collapse independently: Sync &amp; device, App settings, Pay periods, Assistant personality, and Help &amp; guide.</p>
           <h3>Good habits</h3>
@@ -2129,7 +2138,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
       case 'settings':openSettings();break;case 'guide':openSettings();showGuide(true);break;
       case 'newcategory':showTab('plan');openCat({kind:'SPENDING'});break;
       case 'newfund':showTab('plan');openCat({kind:'FUND'});break;
-      case 'newloan':showTab('loans');loanDraft=null;loanOpen=true;$('#loanFormBox').innerHTML='';fillLoans();break;
+      case 'newloan':showTab('loans');openLoan();break;
       case 'loanpayment':addType='Loan';showTab('add');fillAdd();break;
       case 'sync':showTab('home');$('#pendingPanel').open=true;$('#refresh').focus();break;
       default:throw new Error('Unknown assistant destination.');
@@ -2268,8 +2277,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
       '<div class="tiles" id="planTiles"></div></div>' +
       '<div id="planList"></div>' +
       '<div class="btn-row" style="margin:0 0 14px"><button class="btn2 solid" type="button" data-act="newcat" data-kind="SPENDING">New category</button>' +
-      '<button class="btn2" type="button" data-act="newcat" data-kind="FUND">New fund</button></div>' +
-      '<div id="catBox"></div>';
+      '<button class="btn2" type="button" data-act="newcat" data-kind="FUND">New fund</button></div>';
   }
   function fillPlan(){
     ensurePlan();
@@ -2319,8 +2327,36 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
   }
 
   /* category form (new / edit) */
-  function openCat(draft){ catDraft = draft;var box=$('#catBox');if(box)box.innerHTML='';fillCatForm(); var b = $('#catBox'); if (b && b.scrollIntoView) b.scrollIntoView({ block: 'nearest' }); setTimeout(function(){ var n = $('#cName'); if (n) n.focus(); }, 50); }
-  function closeCat(){ catDraft = null; fillCatForm(); }
+  var entityEditor=null,entityFocus=null;
+  function openEntity(kind,title,focus){
+    entityEditor=kind;entityFocus=focus||document.activeElement;
+    $('#entityTitle').textContent=title;$('#entityModal').hidden=false;
+    clearTimeout(toastTimer);$('#toast').hidden=true;
+    [$('#main'),$('.tabs'),$('header')].forEach(function(el){if(el)el.inert=true;});
+    $('#entityClose').focus();
+  }
+  function finishEntity(){
+    entityEditor=null;$('#entityModal').hidden=true;
+    [$('#main'),$('.tabs'),$('header')].forEach(function(el){if(el)el.inert=false;});
+    if(entityFocus&&entityFocus.isConnected)entityFocus.focus();else $('.tabs [aria-selected="true"]').focus();
+    entityFocus=null;
+  }
+  function closeEntity(){
+    if(!entityEditor||saving||reviewResolver)return;
+    if(entityEditor==='cat')closeCat();else{loanDraft=null;loanOpen=false;fillLoans();}
+  }
+  function openCat(draft){
+    if(entityEditor||calendarEditor)return;
+    catDraft=draft;$('#catBox').innerHTML='';fillCatForm();
+    openEntity('cat',(draft.id?'Edit ':'New ')+(draft.kind==='FUND'?'fund':'category'));
+  }
+  function closeCat(){catDraft=null;fillCatForm();if(entityEditor==='cat')finishEntity();}
+  function openLoan(draft){
+    if(entityEditor||calendarEditor)return;
+    var focus=document.activeElement;
+    loanDraft=draft||null;loanOpen=true;$('#loanFormBox').innerHTML='';fillLoans();
+    openEntity('loan',draft?'Edit loan':'New loan',focus);
+  }
   function fillCatForm(){
     var box = $('#catBox'); if (!box) return;
     if (!catDraft) { box.innerHTML = ''; return; }
@@ -2465,11 +2501,11 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
   function reviewChange(title,before,after,confirmLabel){
     if(reviewResolver)return Promise.resolve(false);
     $('#reviewTitle').textContent=title;$('#reviewBefore').textContent=before;$('#reviewAfter').textContent=after;$('#reviewConfirm').textContent=confirmLabel||'Save on device';
-    reviewFocus=document.activeElement;if(calendarEditor)$('#recordEditModal').inert=true;$('#entryReview').hidden=false;$('#reviewCancel').focus();
+    reviewFocus=document.activeElement;if(calendarEditor)$('#recordEditModal').inert=true;if(entityEditor)$('#entityModal').inert=true;$('#entryReview').hidden=false;$('#reviewCancel').focus();
     return new Promise(function(resolve){reviewResolver=resolve;});
   }
   function closeReview(confirmed){
-    if(!reviewResolver)return;var resolve=reviewResolver;reviewResolver=null;$('#entryReview').hidden=true;$('#recordEditModal').inert=false;
+    if(!reviewResolver)return;var resolve=reviewResolver;reviewResolver=null;$('#entryReview').hidden=true;$('#recordEditModal').inert=false;$('#entityModal').inert=false;
     if(reviewFocus&&reviewFocus.isConnected)reviewFocus.focus();resolve(confirmed);
   }
   var calendarEditor=null;
@@ -2491,7 +2527,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
     if(previous.cid===undefined)delete cids.add;else cids.add=previous.cid;
     [$('#main'),$('.tabs'),$('header')].forEach(function(el){if(el)el.inert=false;});
     fillAdd();
-    if(previous.focus&&previous.focus.isConnected)previous.focus.focus();else $('#calendarJump').focus();
+    if(previous.focus&&previous.focus.isConnected)previous.focus.focus();else if(tab==='records')$('#calendarJump').focus();else $('.tabs [aria-selected="true"]').focus();
     if(saved)toast('Changes saved on this device.');
   }
   function cancelEdit(){
@@ -2735,7 +2771,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
   /* ---------- Loans ---------- */
   function ensureLoans(){
     if ($('#loanList')) return;
-    $('#panel-loans').innerHTML = '<div id="loanTop"></div><div id="loanFormBox"></div><div id="loanList"></div>';
+    $('#panel-loans').innerHTML = '<div id="loanTop"></div><div id="loanList"></div>';
   }
   var FREQ = [['SEMI_MONTHLY','Twice a month (15th & end)'],['MONTHLY','Monthly'],['BIWEEKLY','Every 2 weeks'],['WEEKLY','Weekly']];
   function fillLoans(){
@@ -2744,7 +2780,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
     $('#loanTop').innerHTML = '<div class="card"><p class="label">Total owed</p><p class="big-num">' + peso(owed) + '</p>' +
       '<div class="btn-row"><button class="btn2 solid" type="button" data-act="newloan">New loan</button></div></div>';
     var fb = $('#loanFormBox');
-    if (!loanOpen) fb.innerHTML = '';
+    if (!loanOpen) {fb.innerHTML = '';if(entityEditor==='loan')finishEntity();}
     else if(loanDraft&&!$('#loanForm')){fb.innerHTML='<form class="card" id="loanForm" novalidate autocomplete="off"><p class="label">Edit loan</p><label class="fld"><span class="label">Name</span><input id="lName" maxlength="40" value="'+esc(loanDraft.name)+'"></label><label class="fld"><span class="label">Lender</span><input id="lLender" maxlength="40" value="'+esc(loanDraft.lender||'')+'"></label><p class="sub">The existing repayment schedule and payment history are preserved.</p><p class="form-msg" id="loanMsg" role="alert"></p><div class="btn-row"><button class="btn2 solid" type="submit">Review changes</button><button class="btn2" type="button" data-act="loancancel">Cancel</button></div></form>';}
     else if (!$('#loanForm')) {
       fb.innerHTML = '<form class="card" id="loanForm" novalidate autocomplete="off"><p class="label">New loan</p>' +
@@ -2889,7 +2925,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
     else if(act==='calnext')moveCalendarMonth(1);
     else if(act==='caltoday')selectCalendarDate(data.today,true);
     else if(act==='morehistory'){historyLimit+=40;renderHistory();}
-    else if(act==='editentry'||act==='caledit')editEntry(t.getAttribute('data-table'),id,act==='caledit');
+    else if(act==='editentry'||act==='caledit')editEntry(t.getAttribute('data-table'),id,true);
     else if(act==='canceledit')cancelEdit();
     else if(act==='retrysync')load();
     else if(act==='resolvecloud')resolveCloud(id);
@@ -2903,13 +2939,13 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
     else if (act === 'addtype') { addType = t.getAttribute('data-v');if(cloudSnapshot&&cloudSnapshot.capabilities.optionalPlanningVersion===1)$('#fPeriod').value=''; delete cids.add; fillAdd(); if (addType === 'Loan') prefillLoan(); }
     else if (act === 'del') onDelete(t.getAttribute('data-kind'), id);
     else if (act === 'newcat') openCat({ kind: t.getAttribute('data-kind') });
-    else if (act === 'newfund') { showTab('plan'); openCat({ kind: 'FUND' }); }
-    else if (act === 'editcat') { var c = byId(data.categories, id); if (c) { showTab('plan'); openCat({ id: c.id, kind: c.kind, name: c.name, group: c.group, target: c.target, targetDate: c.targetDate, archived: c.archived }); } }
+    else if (act === 'newfund') { openCat({ kind: 'FUND' }); }
+    else if (act === 'editcat') { var c = byId(data.categories, id); if (c) { openCat({ id: c.id, kind: c.kind, name: c.name, group: c.group, target: c.target, targetDate: c.targetDate, archived: c.archived }); } }
     else if (act === 'restorecat') { var r = byId(data.categories, id); mutate('saveCategory', [{ id: id, name: r.name, group: r.group, archived: false, target: r.target, targetDate: r.targetDate }], function(res, err){ toast(err || 'Restored ' + r.name + '.', !!err); }); }
-    else if (act === 'catcancel') closeCat();
-    else if(act==='editloan'){loanDraft=byId(data.loans,id);loanOpen=true;$('#loanFormBox').innerHTML='';fillLoans();$('#loanFormBox').scrollIntoView({block:'nearest'});}
-    else if (act === 'newloan') { loanDraft=null;loanOpen = true;$('#loanFormBox').innerHTML=''; fillLoans(); var lf = $('#loanFormBox'); if (lf.scrollIntoView) lf.scrollIntoView({ block: 'nearest' }); setTimeout(function(){ var n = $('#lName'); if (n) n.focus(); }, 50); }
-    else if (act === 'loancancel') { loanDraft=null;loanOpen = false; fillLoans(); }
+    else if (act === 'catcancel') closeEntity();
+    else if(act==='editloan')openLoan(byId(data.loans,id));
+    else if(act==='newloan')openLoan();
+    else if(act==='loancancel')closeEntity();
     else if (act === 'payloan') { addType = 'Loan';if(cloudSnapshot.capabilities.optionalPlanningVersion===1)$('#fPeriod').value=''; showTab('add'); fillAdd(); $('#fLoan').value = id; $('#fAmount').value = ''; fillAdd(); prefillLoan(); }
   });
   document.addEventListener('change', function(e){
@@ -2946,6 +2982,18 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
   window.addEventListener('ledgerresume',function(){updateAssistantSource();load();});
   $('#personalityReset').addEventListener('click',function(){savePersonality(true);});
   window.addEventListener('storage',function(e){if(ledgerSnapshot&&(e.key===null||e.key===AssistantPersonality.storageKey(ledgerSnapshot.ledgerId))&&settingsOpen)fillPersonality();});
+  $('#entityClose').addEventListener('click',closeEntity);
+  $('#entityModal').addEventListener('click',function(e){if(e.target===this)closeEntity();});
+  document.addEventListener('keydown',function(e){
+    if(!entityEditor||reviewResolver||e.defaultPrevented)return;
+    if(e.key==='Escape'){e.preventDefault();closeEntity();return;}
+    if(e.key!=='Tab')return;
+    var controls=$$('#entityModal button, #entityModal input, #entityModal select').filter(function(el){return !el.disabled&&el.getClientRects().length>0;});
+    if(!controls.length)return;
+    var first=controls[0],last=controls[controls.length-1];
+    if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+    else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+  });
   $('#recordEditClose').addEventListener('click',function(){closeCalendarEditor(false);});
   $('#recordEditModal').addEventListener('click',function(e){if(e.target===this)closeCalendarEditor(false);});
   document.addEventListener('keydown',function(e){

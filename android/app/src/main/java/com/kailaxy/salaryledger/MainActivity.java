@@ -354,7 +354,7 @@ public final class MainActivity extends Activity {
     }
     @Override public void onBackPressed() {
         if (!authorized) { super.onBackPressed(); return; }
-        webView.evaluateJavascript("(function(){var r=document.getElementById('entryReview'),s=document.getElementById('settingsModal'),e=document.getElementById('recordEditModal');if((r&&!r.hidden)||(s&&!s.hidden)||(e&&!e.hidden)){document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));return true;}var a=document.querySelector('.ledger-assistant.is-expanded');if(a){a.querySelector('[data-act=collapseassistant]').click();return true;}return false;})()", handled -> {
+        webView.evaluateJavascript("(function(){var r=document.getElementById('entryReview'),s=document.getElementById('settingsModal'),e=document.getElementById('recordEditModal'),c=document.getElementById('entityModal');if((r&&!r.hidden)||(s&&!s.hidden)||(e&&!e.hidden)||(c&&!c.hidden)){document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));return true;}var a=document.querySelector('.ledger-assistant.is-expanded');if(a){a.querySelector('[data-act=collapseassistant]').click();return true;}return false;})()", handled -> {
             if (!"true".equals(handled)) finish();
         });
     }
