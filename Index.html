@@ -679,6 +679,7 @@
           </div>
           <div class="personality-footer"><button class="btn2" id="personalityReset" type="button">Restore defaults</button><p id="personalitySaveStatus" class="hint" role="status"></p></div>
         </section></div></details>
+        <details class="settings-section" id="settingsUpdates" hidden><summary>App updates</summary><div class="settings-section-body"><p class="sub">Interface updates download in the background and apply when you reopen the app. Native Android changes still need an APK update.</p><div class="btn-row" style="margin-top:12px"><button class="btn2" type="button" data-act="checkupdates" id="checkUpdatesBtn">Check for updates</button><button class="btn2" type="button" data-act="restorefrontend">Restore built-in interface</button></div><p id="updateStatus" class="form-msg" role="status" aria-live="polite"></p></div></details>
         <details class="settings-section" id="settingsHelp"><summary>Help &amp; guide</summary><div class="settings-section-body"><div class="guide-nav"><button class="btn2" id="guideBtn" type="button" data-act="openguide">Guide</button></div></div></details>
       </div>
       <div id="guideView" hidden>
@@ -758,7 +759,7 @@
           <p>Synchronizes confirmed changes and downloads the latest cloud copy. Home shows retries and conflicts. Review current cloud values before discarding a proposal; related pending changes may also need review.</p>
           <h3>Finding plans, funds and loans</h3><p>Open More in the bottom navigation, then choose Plans, Funds or Loans. More remembers the last sub-tab you used. New and edited categories, funds and loans open in modal editors; review changes before confirming. Cancel closes the editor without saving.</p>
           <h3>Records calendar</h3><p>Open Records in the bottom navigation. Dots mark dates with saved or non-conflicting pending records. Choose a date to see that day’s income, expenses, fund movements and loan payments; tap a record to edit it in a modal without leaving the calendar. Category and plan assignment remain optional for expenses, and every change uses the existing review and confirmation. A loan payment and its linked expense appear once. Use the month arrows, Today or Go to date to browse.</p>
-          <p>Settings sections expand and collapse independently: Sync &amp; device, App settings, Pay periods, Assistant personality, and Help &amp; guide.</p>
+          <p>Settings sections expand and collapse independently: Sync &amp; device, App settings, Pay periods, Assistant personality, Help &amp; guide, and App updates in Android.</p>
           <h3>Good habits</h3>
           <ul>
           <li>Record salary first each pay period, then log expenses as they happen.</li>
@@ -806,12 +807,12 @@
       if(!available){reject(new Error('NATIVE_UNAVAILABLE'));return;}
       var id='native_'+Date.now().toString(36)+'_'+(++serial),request={version:1,id:id,action:action};
       if(action==='rpc'){request.method=method;request.args=args;}
-      var timer=setTimeout(function(){delete pending[id];reject(new Error('Native request timed out. Saved changes are preserved.'));},action==='pair'?600000:60000);
+      var timer=setTimeout(function(){delete pending[id];reject(new Error('Native request timed out. Saved changes are preserved.'));},(action==='pair'||action==='restoreFrontend')?600000:action==='checkFrontendUpdates'?90000:60000);
       pending[id]={resolve:resolve,reject:reject,timer:timer};
       try{bridge.postMessage(JSON.stringify(request));}catch(error){clearTimeout(timer);delete pending[id];reject(new Error('NATIVE_UNAVAILABLE'));}
     });
   }
-  root.LedgerNative={available:!!available,rpc:function(method,args){return send('rpc',method,args);},pair:function(){return send('pair');}};
+  root.LedgerNative={available:!!available,rpc:function(method,args){return send('rpc',method,args);},pair:function(){return send('pair');},ready:function(){return send('frontendReady');},checkUpdates:function(){return send('checkFrontendUpdates');},restoreFrontend:function(){return send('restoreFrontend');}};
 })(window);
 </script>
 
@@ -1950,7 +1951,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
   var moreTabs = ['plan','funds','loans'];
   var moreTab = store.get('sl2_more'); if (moreTabs.indexOf(moreTab)<0) moreTab='plan';
   var tab = store.get('sl2_tab'); if (!TITLES[tab]) tab = 'home';
-  var nativeMode=LedgerNative.available;
+  var nativeMode=LedgerNative.available,frontendBooted=false;
   var pin = nativeMode ? 'native-device' : store.get('sl2_pin') || '';
   if(nativeMode)store.del('sl2_pin');
   var planPer = null, addType = 'Expense', armed = null, armTimer = null, cids = {}, toastTimer = null;
@@ -2103,7 +2104,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
   function fillSettings(){
     if (!settingsOpen) return;
     setLocalStatus(localStatus);fillPersonality();
-    $('#nativeDeviceSettings').hidden=!nativeMode;
+    $('#nativeDeviceSettings').hidden=!nativeMode;$('#settingsUpdates').hidden=!nativeMode;
     if(data&&data.setupDone&&$('#setForm'))return;
     $('#settingsBody').innerHTML = data && data.setupDone ? settingsHTML(data) : nativeMode&&!data ? '<p class="sub">Connect this device to download your ledger. Your Google Sheet remains the cloud copy.</p>' : setupCard();
   }
@@ -2919,7 +2920,9 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
     if (!t) return;
     if (t.hasAttribute('data-tab')) { showTab(t.getAttribute('data-tab')); return; }
     var act = t.getAttribute('data-act'), id = t.getAttribute('data-id');
-    if(act==='connectdevice'){var connect=$('#connectDeviceBtn');connect.disabled=true;connect.classList.add('is-busy');connect.textContent='Connecting…';LedgerNative.pair().then(function(){toast('Device connected. Downloading your ledger…');return load();}).catch(function(error){if(!/PAIR_CANCELLED/.test(error.message))toast(error.message,true);}).finally(function(){connect.disabled=false;connect.classList.remove('is-busy');connect.textContent='Connect this device';});}
+    if(act==='checkupdates'){var updateButton=$('#checkUpdatesBtn');updateButton.disabled=true;updateButton.classList.add('is-busy');setMsg('updateStatus','Checking for interface updates…');LedgerNative.checkUpdates().then(function(message){setMsg('updateStatus',typeof message==='string'?message:'Update check finished.');}).catch(function(){setMsg('updateStatus','Could not check for updates. Your installed interface is unchanged.','err');}).finally(function(){updateButton.disabled=false;updateButton.classList.remove('is-busy');});}
+    else if(act==='restorefrontend'){if(saving||reviewResolver){setMsg('updateStatus','Finish the current save before restoring the interface.');return;}LedgerNative.restoreFrontend().then(function(message){setMsg('updateStatus',typeof message==='string'?message:'');}).catch(function(){setMsg('updateStatus','Could not restore the interface. Your saved ledger is unchanged.','err');});}
+    else if(act==='connectdevice'){var connect=$('#connectDeviceBtn');connect.disabled=true;connect.classList.add('is-busy');connect.textContent='Connecting…';LedgerNative.pair().then(function(){toast('Device connected. Downloading your ledger…');return load();}).catch(function(error){if(!/PAIR_CANCELLED/.test(error.message))toast(error.message,true);}).finally(function(){connect.disabled=false;connect.classList.remove('is-busy');connect.textContent='Connect this device';});}
     else if(act==='caldate')selectCalendarDate(t.getAttribute('data-date'),true);
     else if(act==='calprev')moveCalendarMonth(-1);
     else if(act==='calnext')moveCalendarMonth(1);
@@ -2979,7 +2982,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
   window.addEventListener('online', function(){updateAssistantSource();load();});
   window.addEventListener('offline', updateAssistantSource);
   document.addEventListener('visibilitychange',function(){if(document.hidden&&assistantDraft&&!assistantDraft.saving)assistantCancel('Draft closed while the app was in the background. Nothing saved.');});
-  window.addEventListener('ledgerresume',function(){updateAssistantSource();load();});
+  window.addEventListener('ledgerresume',function(){if(nativeMode&&frontendBooted)LedgerNative.ready().catch(function(){});updateAssistantSource();load();});
   $('#personalityReset').addEventListener('click',function(){savePersonality(true);});
   window.addEventListener('storage',function(e){if(ledgerSnapshot&&(e.key===null||e.key===AssistantPersonality.storageKey(ledgerSnapshot.ledgerId))&&settingsOpen)fillPersonality();});
   $('#entityClose').addEventListener('click',closeEntity);
@@ -3054,7 +3057,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
   showTab(tab, true);
   refreshLocal().catch(function(){
     setLocalStatus('Local storage is unavailable. Offline saving is disabled.');
-  }).then(load);
+  }).then(function(){frontendBooted=true;if(nativeMode)LedgerNative.ready().catch(function(){});return load();});
 
 })();
 </script>

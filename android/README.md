@@ -84,7 +84,7 @@ From `android/`, with Java 17, Gradle 8.9 and SDK 35/build tools 34.0.0 installe
 gradle --no-daemon assembleDebug lintDebug testDebugUnitTest
 ```
 
-`generateLedgerAssets` creates the bundled HTML from the root source; do not hand-edit generated assets. **Future frontend changes require a new APK**, as well as Apps Script deployment if the hosted interface should receive them. Server-only changes do not require an APK when the wire contract is unchanged. The workflow runs compilation, lint and JVM security-policy tests and uploads the APK/reports. It does not deploy Apps Script or run phone tests.
+`generateLedgerAssets` creates the bundled HTML from the root source; do not hand-edit generated assets. **Frontend changes can use signed OTA after one owner key setup and updater APK install**; see [frontend OTA](../docs/frontend-ota.md). APKs without an OTA key still need an APK for frontend changes. Hosted browser UI changes still require Apps Script deployment. Server-only changes do not require an APK when the wire contract is unchanged. The workflow runs compilation, lint and JVM security-policy tests and uploads the APK/reports. It does not deploy Apps Script or run phone tests.
 
 ## Verification
 
@@ -114,3 +114,8 @@ Device unlock shows a native indeterminate indicator; first-page startup keeps t
 The frontend shows immediate Unlocking/Connecting/Working button states, blocks duplicate PIN submissions, and displays a temporary refresh status without shifting the main content. Buttons, modal sheets, settings sections, answers and toasts have short entrance/press feedback. CSS reduced-motion preferences disable animations/transitions, including spinner pseudo-elements and press scaling. Errors restore the relevant controls. Browser checks cover delayed unlock, duplicate submissions, refresh failures and reduced motion; native loading transitions still need a device check in the new APK.
 
 Category/fund and loan create/edit forms now open as modal sheets rather than extending their lists. Fund actions retain the Funds sub-tab. Record edits from list views use the same modal editor as the calendar. Cancel/close/Escape discard the open editor's unsaved changes; canceling a review returns to its draft. Existing reviewed local-save/sync paths are unchanged. Native Android Back recognizes the entity editor as well as the record editor; verify that behavior on a device after updating the APK.
+
+
+## Signed frontend OTA
+
+See [one-time setup, publishing and recovery](../docs/frontend-ota.md). Configure a separate OTA signing secret/public variable, then build/install one updater APK with the existing application signing key. Later HTML-only pushes publish signed dev/stable frontend bundles automatically; native changes still require APK updates. Settings → App updates offers checks and built-in recovery, with recovery also available from the native unlock gate. This does not change per-user Sheet setup or the backend deployment process.

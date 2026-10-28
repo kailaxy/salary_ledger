@@ -7,7 +7,7 @@ on:
         type: boolean
         default: false
   push:
-    paths: ['android/**', 'Index.html', '.github/workflows/android.yml']
+    paths: ['android/**', '.github/workflows/android.yml']
   pull_request:
     paths: ['android/**', 'Index.html', '.github/workflows/android.yml']
 permissions:
@@ -17,9 +17,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
+      LEDGER_OTA_PUBLIC_KEY: ${{ vars.LEDGER_OTA_PUBLIC_KEY }}
       LEDGER_DEBUG_PREVIEW: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - name: Set increasing APK version
         shell: bash
         run: echo "LEDGER_VERSION_CODE=$((GITHUB_RUN_NUMBER + 3))" >> "$GITHUB_ENV"

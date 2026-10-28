@@ -39,7 +39,7 @@ public final class MainActivity extends Activity {
     private static final int UNLOCK = 40;
     private final ThreadPoolExecutor network = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(8));
     private WebView webView;
-    private LinearLayout gate;
+    private LinearLayout gate, updateControls;
     private TextView gateText;
     private Button unlockButton;
     private ProgressBar gateProgress;
@@ -47,8 +47,12 @@ public final class MainActivity extends Activity {
     private String deploymentUrl;
     private DeviceCredentials credentials;
     private ScriptTransport transport;
+    private FrontendUpdates updates;
+    private volatile FrontendStore.Selection frontend;
+    private boolean frontendReady;
+    private final android.os.Handler updateTimer=new android.os.Handler(android.os.Looper.getMainLooper());
     private boolean authorized, unlocking, loaded, destroyed, bridgeSupported, pairingOffered, pageReady;
-    private AlertDialog pairingDialog;
+    private AlertDialog pairingDialog, recoveryDialog;
     private final java.util.List<Runnable> deferredReplies = new java.util.ArrayList<>();
 
     @Override public void onCreate(Bundle state) {
@@ -61,6 +65,9 @@ public final class MainActivity extends Activity {
                     | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
         }
         credentials = new DeviceCredentials(this);
+        if(!BuildConfig.OTA_PUBLIC_KEY.isEmpty()&&!BuildConfig.OTA_CHANNEL.equals("preview")){
+            try{updates=new FrontendUpdates(this);}catch(Exception ignored){updates=null;}
+        }
         try { deploymentUrl = credentials.deploymentUrl(); }
         catch (Exception error) { deploymentUrl = null; }
         if (deploymentUrl != null) transport = new ScriptTransport(deploymentUrl);
@@ -97,6 +104,15 @@ public final class MainActivity extends Activity {
         unlockButton.setText("Unlock ledger");
         unlockButton.setOnClickListener(v -> unlock());
         gate.addView(unlockButton);
+        if(updates!=null){
+            updateControls=new LinearLayout(this);updateControls.setOrientation(LinearLayout.VERTICAL);gate.addView(updateControls);
+            Button checkUpdate=new Button(this);checkUpdate.setText("Check for interface updates");
+            checkUpdate.setOnClickListener(v->{checkUpdate.setEnabled(false);updates.check(true,message->runOnUiThread(()->{
+                if(destroyed)return;checkUpdate.setEnabled(true);android.widget.Toast.makeText(this,message,android.widget.Toast.LENGTH_LONG).show();
+            }));});updateControls.addView(checkUpdate);
+            Button restore=new Button(this);restore.setText("Restore built-in interface");
+            restore.setOnClickListener(v->showRestoreDialog(null,null));updateControls.addView(restore);
+        }
         root.addView(gate);
         webView = new WebView(this);
         webView.setVisibility(View.GONE);
@@ -119,13 +135,7 @@ public final class MainActivity extends Activity {
             @Override public void onPageFinished(WebView view, String url) {
                 if (!trustedPage(Uri.parse(url))) return;
                 pageReady = true;
-                if (authorized) showLedger();
-                if (authorized && trustedPage(Uri.parse(url)) && !pairingOffered && credentials.ledgerIdentity() == null) {
-                    pairingOffered = true;
-                    // Use the existing origin-restricted pairing flow and its
-                    // download callback once the packaged page is ready.
-                    view.evaluateJavascript("document.getElementById('connectDeviceBtn').click();", null);
-                }
+                if (authorized && (frontend==null||!frontend.trial||frontendReady)) showLedger();
             }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 return !trustedPage(request.getUrl());
@@ -133,7 +143,10 @@ public final class MainActivity extends Activity {
             @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 if ("data".equals(request.getUrl().getScheme())) return null;
                 if (trustedPage(request.getUrl())) {
-                    WebResourceResponse response = loader.shouldInterceptRequest(request.getUrl());
+                    FrontendStore.Selection selected=frontend;
+                    WebResourceResponse response=selected!=null&&selected.html!=null
+                            ?new WebResourceResponse("text/html","UTF-8",new ByteArrayInputStream(selected.html))
+                            :loader.shouldInterceptRequest(request.getUrl());
                     if (response != null) {
                         java.util.Map<String, String> headers = new java.util.HashMap<>();
                         headers.put("Content-Security-Policy", "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'");
@@ -158,7 +171,7 @@ public final class MainActivity extends Activity {
                     });
         } else {
             gateText.setText("Update Android System WebView (or Chrome) to use the secure offline app.");
-            unlockButton.setEnabled(false);
+            unlockButton.setEnabled(false);if(updateControls!=null)updateControls.setVisibility(View.GONE);
         }
     }
     private static boolean trustedPage(Uri uri) { return BridgePolicy.trustedPage(uri.toString()); }
@@ -168,6 +181,16 @@ public final class MainActivity extends Activity {
         try {
             request = new JSONObject(text); id = request.getString("id");
             if (!id.matches("[A-Za-z0-9_-]{1,80}") || request.optInt("version") != 1) return;
+            if ("checkFrontendUpdates".equals(request.optString("action"))) {
+                if(updates==null){respond(reply,id,"Interface updates are not configured in this APK.",null);return;}
+                final String updateId=id;updates.check(true,message->respond(reply,updateId,message,null));return;
+            }
+            if ("restoreFrontend".equals(request.optString("action"))) {showRestoreDialog(reply,id);return;}
+            if ("frontendReady".equals(request.optString("action"))) {
+                try{boolean firstReady=!frontendReady;if(updates!=null&&frontend!=null&&frontend.trial)updates.store.ready(frontend.revision);
+                    frontendReady=true;updateTimer.removeCallbacksAndMessages(null);if(firstReady&&authorized&&pageReady&&frontend!=null&&frontend.trial)showLedger();respond(reply,id,new JSONObject().put("ready",true),null);
+                }catch(Exception error){respond(reply,id,null,"UPDATE_STATE_ERROR");}return;
+            }
             if ("pair".equals(request.optString("action"))) { showPairing(id, reply); return; }
             if (!"rpc".equals(request.optString("action")) || !ScriptTransport.METHODS.contains(request.optString("method"))) {
                 respond(reply, id, null, "UNSUPPORTED_METHOD"); return;
@@ -289,6 +312,7 @@ public final class MainActivity extends Activity {
     private void updateConnectionGate() {
         boolean setup = deploymentUrl == null;
         deploymentInput.setVisibility(setup ? View.VISIBLE : View.GONE);
+        if(updateControls!=null)updateControls.setVisibility(setup?View.GONE:View.VISIBLE);
         gateText.setText(setup
                 ? "Set up your ledger\n\nPaste the web app /exec URL from your own Google Sheet’s Apps Script deployment. Set your ledger PIN in that Sheet, then generate a one-time pairing code."
                 : "Unlock your device to open Salary Ledger.");
@@ -322,12 +346,52 @@ public final class MainActivity extends Activity {
         gateText.setText("Waiting for device unlock…");
         startActivityForResult(intent, UNLOCK);
     }
+    private void showRestoreDialog(JavaScriptReplyProxy reply,String id){
+        if(updates==null){if(reply!=null)respond(reply,id,"Interface updates are not configured in this APK.",null);return;}
+        if(recoveryDialog!=null){if(reply!=null)respond(reply,id,null,"BUSY");return;}
+        recoveryDialog=new AlertDialog.Builder(this).setTitle("Restore built-in interface?")
+            .setMessage("Saved records, credentials and pending changes will stay on this device. Unsaved forms will close. Interface updates pause until you choose Check for updates.")
+            .setNegativeButton("Cancel",(dialog,which)->{if(reply!=null)respond(reply,id,"Restore canceled.",null);})
+            .setPositiveButton("Restore",(dialog,which)->{
+                try{
+                    updates.store.restoreBundled();updateTimer.removeCallbacksAndMessages(null);
+                    frontend=null;frontendReady=false;loaded=false;pageReady=false;webView.stopLoading();
+                    if(authorized){loaded=true;webView.setVisibility(View.GONE);gate.setVisibility(View.VISIBLE);gateProgress.setVisibility(View.VISIBLE);gateText.setText("Opening the built-in interface…");loadFrontend();}
+                    else gateText.setText("Built-in interface restored. Unlock to continue.");
+                    if(reply!=null)respond(reply,id,"Built-in interface restored.",null);
+                }catch(Exception error){if(reply!=null)respond(reply,id,null,"UPDATE_STATE_ERROR");else gateText.setText("Could not restore the interface. Your saved ledger is unchanged.");}
+            }).create();
+        recoveryDialog.setOnCancelListener(dialog->{if(reply!=null)respond(reply,id,"Restore canceled.",null);});
+        recoveryDialog.setOnDismissListener(dialog->recoveryDialog=null);recoveryDialog.show();
+    }
+    private void loadFrontend() {
+        try{frontend=updates==null?null:updates.store.launch();}catch(Exception error){frontend=null;}
+        frontendReady=false;pageReady=false;
+        webView.loadUrl(PAGE);
+        if(frontend!=null&&frontend.trial)scheduleFrontendTimeout();
+    }
+    private void scheduleFrontendTimeout(){
+        updateTimer.removeCallbacksAndMessages(null);
+        updateTimer.postDelayed(()->{
+            if(destroyed||frontendReady||frontend==null||!frontend.trial)return;
+            if(!authorized){scheduleFrontendTimeout();return;}
+            try{frontend=updates.store.rollback();}catch(Exception error){frontend=null;}
+            pageReady=false;webView.stopLoading();webView.setVisibility(View.GONE);gate.setVisibility(View.VISIBLE);
+            gateText.setText("Restoring the previous interface…");gateProgress.setVisibility(View.VISIBLE);
+            webView.loadUrl(PAGE);
+            android.widget.Toast.makeText(this,"Interface update did not start. Restored the previous interface.",android.widget.Toast.LENGTH_LONG).show();
+        },45000);
+    }
     private void showLedger() {
         unlockButton.setEnabled(true);gateProgress.setVisibility(View.GONE);gate.setVisibility(View.GONE);
         webView.setVisibility(View.VISIBLE);webView.onResume();
         boolean animate = Settings.Global.getFloat(getContentResolver(), Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0;
         webView.animate().cancel();webView.setAlpha(animate ? 0f : 1f);
         if (animate) webView.animate().alpha(1f).setDuration(180).start();
+        if(!pairingOffered&&credentials.ledgerIdentity()==null){
+            pairingOffered=true;webView.evaluateJavascript("document.getElementById('connectDeviceBtn').click();",null);
+        }
+        if(updates!=null)updates.check(false,message->{if(message.startsWith("Interface update downloaded"))runOnUiThread(()->{if(!destroyed&&authorized)android.widget.Toast.makeText(this,message,android.widget.Toast.LENGTH_LONG).show();});});
     }
     @Override protected void onStart() { super.onStart(); if (!authorized && !unlocking) unlock(); }
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -339,8 +403,8 @@ public final class MainActivity extends Activity {
             if (authorized) {
                 if (!loaded) {
                     gateProgress.setVisibility(View.VISIBLE);gateText.setText("Opening your ledger…");
-                    unlockButton.setEnabled(false);loaded = true;webView.onResume();webView.loadUrl(PAGE);
-                } else if (!pageReady) { unlockButton.setEnabled(false);gateProgress.setVisibility(View.VISIBLE);gateText.setText("Opening your ledger…"); }
+                    unlockButton.setEnabled(false);loaded = true;webView.onResume();loadFrontend();
+                } else if (!pageReady||(frontend!=null&&frontend.trial&&!frontendReady)) { unlockButton.setEnabled(false);gateProgress.setVisibility(View.VISIBLE);gateText.setText("Opening your ledger…"); }
                 else { showLedger();webView.evaluateJavascript("window.dispatchEvent(new Event('ledgerresume'));", null); }
                 java.util.List<Runnable> replies = new java.util.ArrayList<>(deferredReplies);
                 deferredReplies.clear(); for (Runnable reply : replies) reply.run();
@@ -361,6 +425,8 @@ public final class MainActivity extends Activity {
     @Override protected void onDestroy() {
         destroyed = true;
         if (pairingDialog != null) pairingDialog.dismiss();
+        if (recoveryDialog != null) recoveryDialog.dismiss();
+        updateTimer.removeCallbacksAndMessages(null);if(updates!=null)updates.close();
         network.shutdownNow();
         webView.stopLoading(); webView.destroy();
         super.onDestroy();

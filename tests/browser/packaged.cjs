@@ -12,7 +12,7 @@ async function countQueue(page,count){for(let i=0;i<100;i++){if(await page.evalu
    // No google.script object exists. Only native messages can synchronize this page.
    Object.defineProperty(window,'google',{get(){throw Error('Hosted transport used from packaged app');}});
    window.LedgerAndroid={onmessage:null,postMessage(text){
-     const request=JSON.parse(text);window.__nativeCalls.push(request);
+     const request=JSON.parse(text);if(request.action==='frontendReady'){setTimeout(()=>LedgerAndroid.onmessage({data:JSON.stringify({id:request.id,ok:true,result:{ready:true}})}),0);return;}window.__nativeCalls.push(request);
      setTimeout(()=>{
        let response={id:request.id,ok:true,result:null};
        if(request.action==='pair'){sessionStorage.setItem('paired','1');response.result={paired:true};}

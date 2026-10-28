@@ -16,6 +16,26 @@ if (!(buildNumber ==~ /[0-9]+/) || buildNumber.toLong() < 3 || buildNumber.toLon
     throw new GradleException('LEDGER_VERSION_CODE must be an integer from 3 to 2100000000')
 }
 
+def otaKey = providers.environmentVariable('LEDGER_OTA_PUBLIC_KEY').orElse('').get().trim()
+def otaBase = providers.environmentVariable('LEDGER_OTA_BASE').orElse('https://github.com/kailaxy/salary_ledger/releases/download/').get().trim()
+if (otaKey && !(otaKey ==~ /[A-Za-z0-9+\/=]{400,1200}/)) throw new GradleException('LEDGER_OTA_PUBLIC_KEY must be a base64 RSA SubjectPublicKeyInfo DER key')
+if (otaKey) {
+    try {
+        def decoded = java.util.Base64.decoder.decode(otaKey)
+        def key = java.security.KeyFactory.getInstance('RSA').generatePublic(new java.security.spec.X509EncodedKeySpec(decoded))
+        if (((java.security.interfaces.RSAPublicKey) key).modulus.bitLength() < 3072) throw new IllegalArgumentException('Weak OTA key')
+    } catch (Exception error) { throw new GradleException('Invalid RSA OTA public key; run tools/ota/setup.py', error) }
+}
+if (!(otaBase ==~ /https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/releases\/download\//)) throw new GradleException('Invalid LEDGER_OTA_BASE')
+def frontendRevision = System.getenv('LEDGER_FRONTEND_REVISION') ?: ''
+if (!frontendRevision) {
+    def shallow = providers.exec { workingDir rootProject.projectDir; commandLine 'git', 'rev-parse', '--is-shallow-repository'; ignoreExitValue true }.standardOutput.asText.get().trim()
+    if (otaKey && shallow != 'false') throw new GradleException('OTA builds require full Git history or LEDGER_FRONTEND_REVISION')
+    frontendRevision = providers.exec { workingDir rootProject.projectDir; commandLine 'git', 'rev-list', '--count', 'HEAD'; ignoreExitValue true }.standardOutput.asText.get().trim()
+}
+if (!(frontendRevision ==~ /[0-9]{1,15}/)) { if (otaKey) throw new GradleException('Invalid frontend revision'); frontendRevision='0' }
+frontendRevision=frontendRevision.toLong().toString()
+
 android {
     namespace 'com.kailaxy.salaryledger'
     compileSdk 35
@@ -24,8 +44,12 @@ android {
         minSdk 26
         targetSdk 35
         versionCode buildNumber.toInteger()
-        versionName '0.4.0'
+        versionName '0.5.0'
         resValue 'string', 'app_name', 'Salary Ledger'
+        buildConfigField 'String', 'OTA_PUBLIC_KEY', '"' + otaKey + '"'
+        buildConfigField 'String', 'OTA_BASE', '"' + otaBase + '"'
+        buildConfigField 'String', 'OTA_CHANNEL', '"stable"'
+        buildConfigField 'long', 'FRONTEND_REVISION', frontendRevision + 'L'
     }
     buildFeatures { buildConfig true }
     signingConfigs {
@@ -48,6 +72,7 @@ android {
     }
     buildTypes {
         debug {
+            buildConfigField 'String', 'OTA_CHANNEL', debugPreview ? '"preview"' : '"dev"'
             applicationIdSuffix debugPreview ? '.debug.preview' : '.debug'
             versionNameSuffix debugPreview ? '-preview' : '-dev'
             resValue 'string', 'app_name', debugPreview ? 'Salary Ledger Preview' : 'Salary Ledger Dev'

@@ -39,7 +39,7 @@ module.exports=async function({page,native}){
      const record=entry.proposalRecord,fingerprint='b'.repeat(64);LedgerPending.applyRecord(window.__assistantServer,payload.table,record,fingerprint);
      return {status:'committed',mutationId:payload.mutationId,recordId:payload.recordId,record,fingerprint,committedAt:new Date().toISOString()};
    }
-   if(native)LedgerAndroid.postMessage=raw=>{const r=JSON.parse(raw);response(r.method,r.args).then(result=>LedgerAndroid.onmessage({data:JSON.stringify({id:r.id,ok:true,result})}));};
+   if(native)LedgerAndroid.postMessage=raw=>{const r=JSON.parse(raw);if(r.action==='frontendReady'){setTimeout(()=>LedgerAndroid.onmessage({data:JSON.stringify({id:r.id,ok:true,result:{ready:true}})}),0);return;}response(r.method,r.args).then(result=>LedgerAndroid.onmessage({data:JSON.stringify({id:r.id,ok:true,result})}));};
    else Object.defineProperty(google.script,'run',{configurable:true,get(){let ok,bad;return {withSuccessHandler(f){ok=f;return this;},withFailureHandler(f){bad=f;return this;},getLedgerSnapshot(...args){response('getLedgerSnapshot',args).then(ok,bad);},syncLedgerMutation(...args){response('syncLedgerMutation',args).then(ok,bad);}};}});
    window.__online=true;dispatchEvent(new Event('online'));
  },native);

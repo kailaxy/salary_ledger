@@ -19,7 +19,7 @@ async function queue(page,count){await waitFor(page,async n=>(await LedgerLocal.
  });
  await page.addInitScript(({native})=>{
    if(!native)localStorage.setItem('sl2_pin','123456');Object.defineProperty(navigator,'onLine',{get:()=>sessionStorage.getItem('offline')!=='1'});
-   if(native){window.LedgerAndroid={onmessage:null,postMessage(text){const request=JSON.parse(text);window.testRPC(request.method,request.args).then(result=>LedgerAndroid.onmessage({data:JSON.stringify({id:request.id,ok:true,result})}),error=>LedgerAndroid.onmessage({data:JSON.stringify({id:request.id,ok:false,error:error.message})}));}};return;}
+   if(native){window.LedgerAndroid={onmessage:null,postMessage(text){const request=JSON.parse(text);if(request.action==='frontendReady'){setTimeout(()=>LedgerAndroid.onmessage({data:JSON.stringify({id:request.id,ok:true,result:{ready:true}})}),0);return;}window.testRPC(request.method,request.args).then(result=>LedgerAndroid.onmessage({data:JSON.stringify({id:request.id,ok:true,result})}),error=>LedgerAndroid.onmessage({data:JSON.stringify({id:request.id,ok:false,error:error.message})}));}};return;}
    window.google={script:{}};Object.defineProperty(google.script,'run',{get(){let success,failure;const runner=new Proxy({withSuccessHandler(fn){success=fn;return runner;},withFailureHandler(fn){failure=fn;return runner;}},{get(target,name){return name in target?target[name]:(...args)=>{if(!navigator.onLine){failure(Error('offline'));return;}window.testRPC(name,args).then(success,failure);};}});return runner;}});
  },{native});
  const url=native?'https://appassets.androidplatform.net/assets/Index.html':'https://ledger.test/';

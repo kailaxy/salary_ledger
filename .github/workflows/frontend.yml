@@ -1,0 +1,96 @@
+name: Publish signed frontend
+on:
+  push:
+    branches: [main]
+    paths: ['Index.html', 'tools/ota/**', '.github/workflows/frontend.yml']
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: 'Frontend channel (stable for release APKs, dev for Dev APKs)'
+        type: choice
+        options: [stable, dev]
+        default: stable
+permissions:
+  contents: write
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    strategy:
+      matrix:
+        channel: ${{ fromJSON(github.event_name == 'push' && '["dev","stable"]' || format('["{0}"]', inputs.channel)) }}
+    concurrency:
+      group: frontend-${{ matrix.channel }}
+      cancel-in-progress: false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CHANNEL: ${{ matrix.channel }}
+      LEDGER_OTA_PUBLIC_KEY: ${{ vars.LEDGER_OTA_PUBLIC_KEY }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Validate ledger and frontend
+        run: |
+          npm ci --prefix tests
+          npm test --prefix tests
+          python3 -m unittest discover -s tools/ota -p 'test_*.py'
+      - name: Browser regression checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          browser="$(command -v google-chrome || command -v chromium || true)"
+          if [[ -z "$browser" ]]; then
+            npx --prefix tests playwright-core install --with-deps chromium
+            browser="$(node -p "require('./tests/node_modules/playwright-core').chromium.executablePath()")"
+          fi
+          CHROMIUM_PATH="$browser" npm run test:browser --prefix tests
+      - name: Build and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LEDGER_OTA_PRIVATE_KEY: ${{ secrets.LEDGER_OTA_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$LEDGER_OTA_PRIVATE_KEY" || -z "$LEDGER_OTA_PUBLIC_KEY" ]]; then
+            echo '::notice::OTA is not configured. Run tools/ota/setup.py --configure-github, then build/install an updater APK.'
+            if [[ '${{ github.event_name }}' == 'workflow_dispatch' ]]; then exit 1; fi
+            exit 0
+          fi
+          umask 077
+          ota_key="$RUNNER_TEMP/frontend-private.pem"
+          trap 'rm -f "$ota_key"' EXIT
+          printf '%s' "$LEDGER_OTA_PRIVATE_KEY" > "$ota_key"
+          unset LEDGER_OTA_PRIVATE_KEY
+          tag="frontend-$CHANNEL"
+          mkdir -p "$RUNNER_TEMP/frontend-previous"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            manifest_count="$(gh release view "$tag" --json assets --jq '[.assets[] | select(.name == "manifest.txt")] | length')"
+            if [[ "$manifest_count" != 0 ]]; then
+              gh release download "$tag" -p manifest.txt --dir "$RUNNER_TEMP/frontend-previous"
+            fi
+          fi
+          python3 tools/ota/bundle.py --revision "$(git rev-list --count HEAD)" --channel "$CHANNEL" \
+            --key "$ota_key" --output "$RUNNER_TEMP/frontend-out" --previous "$RUNNER_TEMP/frontend-previous/manifest.txt"
+          if [[ ! -f "$RUNNER_TEMP/frontend-out/manifest.txt" ]]; then exit 0; fi
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --target "$GITHUB_SHA" --title "Frontend $CHANNEL" --notes 'Signed offline frontend updates. Native APKs are distributed separately.' --prerelease --latest=false
+          fi
+          # Immutable revision asset first, signed channel pointer last.
+          bundle="$(basename "$RUNNER_TEMP/frontend-out/"*.html)"
+          existing="$(gh release view "$tag" --json assets --jq "[.assets[] | select(.name == \"$bundle\")] | length")"
+          if [[ "$existing" != 0 ]]; then
+            gh release download "$tag" -p "$bundle" --dir "$RUNNER_TEMP/frontend-previous"
+            cmp "$RUNNER_TEMP/frontend-out/$bundle" "$RUNNER_TEMP/frontend-previous/$bundle"
+          else
+            gh release upload "$tag" "$RUNNER_TEMP/frontend-out/$bundle"
+          fi
+          gh release upload "$tag" "$RUNNER_TEMP/frontend-out/manifest.txt" --clobber

@@ -15,3 +15,19 @@ test('pairing launches a native operation with no frontend credential fields',as
  const e=create('https://appassets.androidplatform.net'),result=e.client.pair(),request=e.calls[0];assert.deepEqual(Object.keys(request).sort(),['action','id','version']);
  e.bridge.onmessage({data:JSON.stringify({id:request.id,ok:false,error:'PAIR_CANCELLED'})});await assert.rejects(result,/PAIR_CANCELLED/);
 });
+
+
+test('frontend readiness is a native-only signal without ledger credentials',async()=>{
+ const e=create('https://appassets.androidplatform.net'),result=e.client.ready(),request=e.calls[0];
+ assert.equal(request.action,'frontendReady');assert.deepEqual(Object.keys(request).sort(),['action','id','version']);
+ e.bridge.onmessage({data:JSON.stringify({id:request.id,ok:true,result:{ready:true}})});assert.equal((await result).ready,true);
+});
+
+
+for(const [method,action] of [['checkUpdates','checkFrontendUpdates'],['restoreFrontend','restoreFrontend']]){
+ test(method+' cannot select a download URL or pass credentials',async()=>{
+  const e=create('https://appassets.androidplatform.net'),result=e.client[method](),request=e.calls[0];
+  assert.equal(request.action,action);assert.deepEqual(Object.keys(request).sort(),['action','id','version']);
+  e.bridge.onmessage({data:JSON.stringify({id:request.id,ok:true,result:'Test status'})});assert.equal(await result,'Test status');
+ });
+}

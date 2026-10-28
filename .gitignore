@@ -17,3 +17,6 @@ android-ai-benchmark/third_party/
 android-ai-benchmark/benchmark-results/*.json
 android-ai-benchmark/benchmark-results/*.csv
 __pycache__/
+
+# OTA signing keys stay local; GitHub holds the publishing secret.
+.ota-keys/
