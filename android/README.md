@@ -119,3 +119,6 @@ Category/fund and loan create/edit forms now open as modal sheets rather than ex
 ## Signed frontend OTA
 
 See [one-time setup, publishing and recovery](../docs/frontend-ota.md). Configure a separate OTA signing secret/public variable, then build/install one updater APK with the existing application signing key. Later HTML-only pushes publish signed dev/stable frontend bundles automatically; native changes still require APK updates. Settings → App updates offers checks and built-in recovery, with recovery also available from the native unlock gate. This does not change per-user Sheet setup or the backend deployment process.
+
+
+Paid loans are collapsed under a Paid loans history section; hiding them does not delete genuine payments or alter totals. Calendar, recent/history and loan-payment record editors expose Delete record with an explicit review and Confirm deletion step. The former timed Delete → Sure? interaction is removed. Linked loan payments/spending are removed together through the existing atomic operation, and deletion errors remain visible in the open editor. Editing an amount to 1 is still a recorded amount, not deletion. This is an HTML-only change: use OTA if configured, or build/install an APK manually; no new backend API is required.

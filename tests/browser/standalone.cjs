@@ -29,7 +29,7 @@ async function confirm(page){await page.locator('#reviewConfirm').click();}
  await page.locator('#tab-add').click();await page.locator('#fCat').selectOption('cat_food');await page.locator('#fPeriod').selectOption('per_test');await page.locator('#fAmount').fill('250');await page.locator('#addGo').click();await confirm(page);await queue(page,3);
  budget=await page.evaluate(async()=>{const v=await LedgerLocal.view();return LedgerQuery.query(LedgerPending.project(v.snapshot,v.entries),{action:'query',operation:'budgets',kind:'expense',range:'current_period',mode:'remaining',categoryId:'cat_food'}).budgets[0].remainingMinor;});assert.equal(budget,75000);
  const linked=await page.evaluate(async()=>(await LedgerLocal.list('test-ledger'))[2].payload.recordId);
- await page.locator('#tab-add').click();await page.locator('[data-act="del"][data-id="'+linked+'"]').click();await page.locator('[data-act="del"][data-id="'+linked+'"]').click();await confirm(page);await queue(page,4);
+ await page.locator('#tab-add').click();await page.locator('[data-act="del"][data-id="'+linked+'"]').click();await confirm(page);await queue(page,4);
  let view=await page.evaluate(async()=>{const v=await LedgerLocal.view(),s=LedgerPending.project(v.snapshot,v.entries);return {total:s.state.summary.spent,plan:s.state.plan.per_test.cat_food,linked:s.state.byCat.per_test?.cat_food||0};});assert.deepEqual(view,{total:240,plan:1000,linked:0});
  // Normal Add form can save with no category/period selection as well.
  await page.locator('#fCat').selectOption('');await page.locator('#fPeriod').selectOption('');await page.locator('#fAmount').fill('90');await page.locator('#fNote').fill('Random expense');await page.locator('#addGo').click();await confirm(page);await queue(page,5);

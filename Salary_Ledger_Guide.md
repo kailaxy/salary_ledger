@@ -55,7 +55,7 @@ One form for everything you record. Pick the type at the top:
 - **Income**: salary, bonus or other, with an optional source such as your employer. You can enter more than one per pay period.
 - **Loan pay**: choose the loan; the amount is filled in with the next installment. Leave **Also count it as spending** ticked if the payment should reduce your budget in a category (for example, Loan Payment).
 
-Recent entries appear below the form. Tap **Edit** for income, expenses, fund movements or loan payments; review before saving. **Find an older entry** searches the full saved history by category, note, date or ID. A loan payment and its counted spending are edited together. For deletion, tap **Delete**, **Sure?**, then review all affected records. Deletions retain history in the Sheet. Fund changes cannot overdraw a fund. Each loan can have one pending new payment; synchronize or resolve it before recording another.
+Recent entries appear below the form. Tap **Edit** for income, expenses, fund movements or loan payments; review before saving. **Find an older entry** searches the full saved history by category, note, date or ID. A loan payment and its counted spending are edited together. For deletion, tap **Delete** once, review the affected records, then choose **Confirm deletion**. You can also open a record and choose **Delete record** in its editor. Canceling the review changes nothing. Deletions retain history in the Sheet. Fund changes cannot overdraw a fund. Each loan can have one pending new payment; synchronize or resolve it before recording another.
 
 ### Funds
 Every fund with its balance, progress toward its target, how far you have to go, and whether you are on track against your plan so far. **New fund** starts a fund from here.
@@ -64,7 +64,7 @@ Every fund with its balance, progress toward its target, how far you have to go,
 - **New loan**: enter what you borrowed, the total to repay (including interest and fees), the number of installments, the first due date, and how often you pay (twice a month, monthly, every 2 weeks or weekly).
 - Each loan card shows progress, what is left, and the next installment due. **Installments** lists the full schedule with paid, partial and overdue marks. **Payments** lists what you have paid.
 - **Record payment** jumps to the Add screen for that loan. Payments cover installments oldest first.
-- **Edit loan** changes its name and lender while preserving the existing schedule. You can delete a loan only after its payments are deleted.
+- **Edit loan** changes its name and lender while preserving the existing schedule. Completed loans are collapsed under **Paid loans**, keeping their payment history without filling the active list. Loan deletion is limited to loans without recorded payments.
 
 ### Settings (gear icon, top right)
 - **App name**: rename the app.
