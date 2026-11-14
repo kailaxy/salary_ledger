@@ -125,3 +125,6 @@ Paid loans are collapsed under a Paid loans history section; hiding them does no
 
 
 Recent entries shows only five tappable records; edit and delete actions live in the record modal. History searches all saved records and reveals ten results at a time. Home pay-period history is collapsed by default. Routine helper text and empty-message gaps are reduced; validation, sync states, financial fields and linked-payment deletion warnings remain available.
+
+
+Record save/edit confirmations now show a compact amount/date summary and relevant changed fields. The full before/after comparison remains under Full details. Loan-payment spending effects and remaining-balance context stay visible; deletion and conflict reviews remain fully expanded by default. Confirmation, validation and saving behavior are unchanged.

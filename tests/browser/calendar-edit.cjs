@@ -30,7 +30,7 @@ async function confirm(page){await page.locator('#reviewConfirm').click();}
   assert.equal(await page.locator('#addForm').count(),1);
   await page.locator('#fNote').fill(label+' edited');
   if(!native&&count===1)await page.screenshot({path:'/tmp/ledger-calendar-edit-modal.png',fullPage:true,animations:'disabled'});
-  await page.locator('#addGo').click();await confirm(page);await queue(page,++count);
+  await page.locator('#addGo').click();assert.equal(await page.locator('#reviewSummary').isVisible(),true);assert.equal(await page.locator('#reviewDetails').evaluate(el=>el.open),false);assert.match(await page.locator('#reviewSummary').innerText(),/Note:/);await confirm(page);await queue(page,++count);
   assert.equal(await page.locator('#recordEditModal').isVisible(),false);
   assert.match(await page.locator('#calendarRecords').innerText(),new RegExp(label+' edited'));
  }

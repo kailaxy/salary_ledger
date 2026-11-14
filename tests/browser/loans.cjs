@@ -2,6 +2,7 @@ const {waitFor}=require('./wait.cjs');
 const {chromium}=require('playwright-core'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {loanFixture}=require('../helpers/loan-server.cjs');
 async function queue(page,count){await waitFor(page,async n=>(await LedgerLocal.list('test-ledger')).length===n,count);}
+async function readReview(page,id){await page.locator('#reviewDetails').evaluate(el=>el.open=true);return page.locator('#'+id).innerText();}
 (async()=>{
  for(const native of [false,true]){
  const server=loanFixture();for(const table of ['SETTINGS','BUDGET_LINES','FUND_GOALS'])server.put(table,{});
@@ -28,7 +29,7 @@ async function queue(page,count){await waitFor(page,async n=>(await LedgerLocal.
  await page.goto(url);await page.waitForFunction(()=>document.querySelector('#assistantSource').textContent.includes('Updated'));
  await page.evaluate(()=>{sessionStorage.setItem('offline','1');dispatchEvent(new Event('offline'));});
  await page.locator('#tab-add').click();await page.locator('[data-act="addtype"][data-v="Loan"]').click();await page.locator('#fAmount').fill('500');await page.locator('#fNote').fill('Phone installment');await page.locator('#addGo').click();
- assert.match(await page.locator('#reviewBefore').innerText(),/1,000.00/);assert.match(await page.locator('#reviewAfter').innerText(),/Count as spending: Yes/);assert.match(await page.locator('#reviewAfter').innerText(),/Owed after: ₱500.00/);
+ assert.match(await readReview(page,'reviewBefore'),/1,000.00/);assert.match(await readReview(page,'reviewAfter'),/Count as spending: Yes/);assert.match(await readReview(page,'reviewAfter'),/Owed after: ₱500.00/);
  await page.locator('#reviewCancel').click();await queue(page,0);await page.locator('#addGo').click();await page.locator('#reviewConfirm').click();await queue(page,1);
  await page.reload();await page.waitForFunction(()=>document.querySelector('#assistantSource').textContent.includes('cached')||document.querySelector('#assistantSource').textContent.includes('Updated'));await queue(page,1);
  const projected=await page.evaluate(async()=>{const v=await LedgerLocal.view();return LedgerPending.project(v.snapshot,v.entries);});assert.equal(projected.state.summary.spent,500);assert.equal(projected.state.loans[0].remaining,500);assert.equal(projected.state.recent.filter(r=>r.kind==='loanpay').length,1);assert.equal(projected.state.recent.filter(r=>r.kind==='txn').length,0);
@@ -39,12 +40,12 @@ async function queue(page,count){await waitFor(page,async n=>(await LedgerLocal.
  assert.equal(server.rows('LOAN_PAYMENTS').length,1);assert.equal(server.rows('TRANSACTIONS').length,1);assert.equal(server.rows('LOAN_PAYMENTS')[0].installment_id,'ins_first');
  await page.waitForFunction(()=>!document.querySelector('#refresh').classList.contains('spin'));
  // Final unmirrored payment pays off the loan without another expense.
- await page.evaluate(()=>{sessionStorage.setItem('offline','1');dispatchEvent(new Event('offline'));});await page.locator('#tab-add').click();await page.locator('[data-act="addtype"][data-v="Loan"]').click();await page.locator('#fAlso').uncheck();await page.locator('#fAmount').fill('500');await page.locator('#addGo').click();assert.match(await page.locator('#reviewAfter').innerText(),/Count as spending: No/);await page.locator('#reviewConfirm').click();await queue(page,1);
+ await page.evaluate(()=>{sessionStorage.setItem('offline','1');dispatchEvent(new Event('offline'));});await page.locator('#tab-add').click();await page.locator('[data-act="addtype"][data-v="Loan"]').click();await page.locator('#fAlso').uncheck();await page.locator('#fAmount').fill('500');await page.locator('#addGo').click();assert.match(await readReview(page,'reviewAfter'),/Count as spending: No/);await page.locator('#reviewConfirm').click();await queue(page,1);
  const final=await page.evaluate(async()=>{const v=await LedgerLocal.view();return LedgerPending.project(v.snapshot,v.entries).state;});assert.equal(final.loans[0].status,'PAID');assert.equal(final.summary.spent,500);
  // A payment from another device changes the debt while this proposal is queued.
  server.put('LOAN_PAYMENTS',{payment_id:'pay_other_device',loan_id:'lon_test',amount:100,paid_date:'2026-10-22',note:'Other device'});
  await page.evaluate(()=>{sessionStorage.removeItem('offline');dispatchEvent(new Event('online'));});await waitFor(page,async()=>(await LedgerLocal.list('test-ledger'))[0]?.status==='conflict');
- await page.locator('#tab-home').click();await page.locator('#pendingPanel').evaluate(e=>e.open=true);await page.locator('[data-act="resolvecloud"]').click();assert.match(await page.locator('#reviewAfter').innerText(),/Cloud amount owed: ₱400.00/);
+ await page.locator('#tab-home').click();await page.locator('#pendingPanel').evaluate(e=>e.open=true);await page.locator('[data-act="resolvecloud"]').click();assert.match(await readReview(page,'reviewAfter'),/Cloud amount owed: ₱400.00/);
  await page.locator('#reviewCancel').click();await queue(page,1);await page.locator('[data-act="resolvecloud"]').click();await page.locator('#reviewConfirm').click();await queue(page,0);
  await page.locator('#tab-add').click();await page.locator('[data-act="addtype"][data-v="Loan"]').click();await page.locator('#fAlso').uncheck();await page.locator('#fAmount').fill('400');await page.locator('#addGo').click();await page.locator('#reviewConfirm').click();await queue(page,0);
  await waitFor(page,async()=>{const s=await LedgerLocal.restore();return (await LedgerLocal.list('test-ledger')).length===0&&s.tables.LOAN_PAYMENTS.length===3&&s.state.loans[0].status==='PAID';});

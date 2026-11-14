@@ -1,3 +1,4 @@
+async function readReview(page,id){await page.locator('#reviewDetails').evaluate(el=>el.open=true);return page.locator('#'+id).innerText();}
 const {chromium}=require('playwright-core');const fs=require('fs');const path=require('node:path');
 async function waitQueue(page,count){for(let i=0;i<100;i++){if(await page.evaluate(async()=> (await LedgerLocal.list('test-ledger')).length)===count)return;await page.waitForTimeout(50);}throw Error('Queue count did not become '+count);}
 let debugPage;
@@ -44,14 +45,14 @@ let debugPage;
  await page.evaluate(()=>{const r={...window.__server.tables.TRANSACTIONS[0].record,amount:900};LedgerPending.applyRecord(window.__server,'TRANSACTIONS',r,'d'.repeat(64));window.__online=true;dispatchEvent(new Event('online'));});
  for(let i=0;i<100;i++){if(await page.evaluate(async()=> (await LedgerLocal.list('test-ledger'))[0]?.status)==='conflict')break;await page.waitForTimeout(50);}
  await page.locator('#tab-home').click();await page.locator('#pendingPanel').evaluate(e=>e.open=true);await page.locator('[data-act="resolvecloud"]').click();
- if(!await page.locator('#reviewAfter').innerText().then(t=>t.includes('900.00')))throw Error('Conflict review omitted cloud amount');
+ if(!await readReview(page,'reviewAfter').then(t=>t.includes('900.00')))throw Error('Conflict review omitted cloud amount');
  await page.locator('#reviewCancel').click();await waitQueue(page,1);await page.locator('[data-act="resolvecloud"]').click();await page.locator('#reviewConfirm').click();await waitQueue(page,0);
  if(await page.evaluate(async()=> (await LedgerLocal.restore()).tables.TRANSACTIONS[0].record.amount)!==900)throw Error('Cloud resolution failed');
  await page.waitForFunction(()=>!document.querySelector('#refresh').classList.contains('spin'));
  await page.evaluate(()=>{window.__online=false;dispatchEvent(new Event('offline'));});
  await page.locator('#tab-add').click();await page.locator('[data-act="addtype"][data-v="Fund"]').click();
  await page.locator('#fAmount').fill('100');await page.locator('#fDir').selectOption('IN');await page.locator('#addGo').click();
- if(!(await page.locator('#reviewAfter').innerText()).includes('Deposit to fund'))throw Error('Fund confirmation lacks direction');
+ if(!(await readReview(page,'reviewAfter')).includes('Deposit to fund'))throw Error('Fund confirmation lacks direction');
  await page.locator('#reviewConfirm').click();await waitQueue(page,1);await page.waitForFunction(()=>!document.querySelector('#addGo').disabled);
  await page.locator('#fAmount').fill('60');await page.locator('#fDir').selectOption('OUT');await page.locator('#addGo').click();await page.locator('#reviewConfirm').click();await waitQueue(page,2);
  await page.waitForFunction(()=>!document.querySelector('#addGo').disabled);await page.locator('#fAmount').fill('41');await page.locator('#addGo').click();

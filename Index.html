@@ -655,8 +655,11 @@
   <div class="modal" id="entryReview" hidden>
     <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="reviewTitle">
       <div class="sheet-head"><h2 id="reviewTitle">Review entry</h2></div>
-      <p class="label">Before</p><p class="review-record" id="reviewBefore"></p>
-      <p class="label">After</p><p class="review-record" id="reviewAfter"></p>
+      <p class="review-record" id="reviewSummary" hidden></p>
+      <details id="reviewDetails"><summary>Full details</summary><div style="margin-top:12px">
+        <p class="label">Before</p><p class="review-record" id="reviewBefore"></p>
+        <p class="label">After</p><p class="review-record" id="reviewAfter"></p>
+      </div></details>
 
       <div class="btn-row" style="margin-top:16px"><button class="btn2" id="reviewCancel" type="button">Go back</button><button class="btn2 solid" id="reviewConfirm" type="button">Save on device</button></div>
     </div>
@@ -2430,8 +2433,15 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
     var payload={version:1,ledgerId:cloudSnapshot.ledgerId,mutationId:newLocalId('req_'),operation:'bundle',table:'OPERATIONS',recordId:newLocalId('op_'),values:{action:action,args:args,expected:LedgerOperations.context(ledgerSnapshot,action)}};
     var revision=LedgerPending.operationRevision(cloudSnapshot,pendingEntries,action),proposal=LedgerPending.validate(cloudSnapshot,pendingEntries,payload,revision);
     if(!proposal.changes.length)throw new Error('No changes to save.');
+    var compact=null;
+    if(action==='editRecord'){
+      var target=proposal.changes.find(function(c){return c.table===args[0].table&&c.after[LedgerPending.key(c.table)]===args[0].id;});
+      if(target){compact=compactRecord(target.after,target.table,target.before);
+        if(target.table==='LOAN_PAYMENTS'){var linked=proposal.changes.find(function(c){return c.table==='TRANSACTIONS';});if(linked&&linked.after&&!linked.after.deleted_at){['category_id','period_id'].forEach(function(key){if((linked.before&&linked.before[key]||'')!==(linked.after[key]||'')){var list=key==='category_id'?data.categories:data.periods,old=linked.before&&byId(list,linked.before[key]),next=byId(list,linked.after[key]);compact+='\n'+(key==='category_id'?'Category':'Plan')+': '+(old?old.name||old.label:'None')+' → '+(next?next.name||next.label:'None');}});}}
+      }
+    }
     var reviewTitle=action==='deleteRecord'?'Delete '+(args[0]==='loanpay'?'loan payment':args[0]==='income'?'income record':'transaction')+'?':proposal.title;
-    if(!await reviewChange(reviewTitle,operationDescription(proposal,'before'),operationDescription(proposal,'after'),/^delete/.test(action)?'Confirm deletion':undefined)){if(action==='setBudget')fillPlan();throw new Error('Cancelled. No changes saved.');}
+    if(!await reviewChange(reviewTitle,operationDescription(proposal,'before'),operationDescription(proposal,'after'),/^delete/.test(action)?'Confirm deletion':undefined,compact)){if(action==='setBudget')fillPlan();throw new Error('Cancelled. No changes saved.');}
     await LedgerLocal.enqueue(payload,revision);await refreshLocal();syncRequested=true;load();return {state:data,queued:true};
   }
   async function resolveOperationConflict(entry){
@@ -2516,8 +2526,30 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
     var income=table==='INCOME',cat=ledgerSnapshot.tables.CATEGORIES.find(function(x){return x.record.category_id===record.category_id;}),p=byId(data.periods,record.period_id);
     return ['Amount: '+ledgerSnapshot.currency+nf.format(record.amount),'Date: '+(income?record.received_date:record.txn_date),(income||record.type!=='EXPENSE'?'Reporting period: ':'Plan link: ')+(p?p.label:record.period_id||'None · reported by date'),income?'Income type: '+record.kind:'Category: '+(cat?cat.record.name:record.category_id||'Uncategorized'),income?'Source: '+(record.source||'None'):'Type: '+(record.type==='FUND_IN'?'Deposit to fund':record.type==='FUND_OUT'?'Withdraw from fund':'Expense'), 'Note: '+(record.note||'None')].filter(Boolean).join('\n');
   }
-  function reviewChange(title,before,after,confirmLabel){
+  function compactRecord(record,table,before){
+    var lines=[],income=table==='INCOME',payment=table==='LOAN_PAYMENTS';
+    var dateKey=income?'received_date':payment?'paid_date':'txn_date';
+    function line(label,old,value){
+      if(before&&String(old||'')===String(value||''))return;
+      lines.push(label+': '+(before?(old||'None')+' → ':'')+(value||'None'));
+    }
+    lines.push((payment?'Payment: ':'')+peso(record.amount)+(before&&before.amount!==record.amount?' (was '+peso(before.amount)+')':''));
+    lines.push(before&&before[dateKey]!==record[dateKey]?'Date: '+fmtLong(before[dateKey])+' → '+fmtLong(record[dateKey]):fmtLong(record[dateKey]));
+    if(payment){var loan=byId(data.loans,record.loan_id);lines.push(loan?loan.name:'Loan payment');line('Count as spending',before?(before.txn_id?'Yes':'No'):null,record.txn_id?'Yes':'No');if(record.txn_id||before&&before.txn_id)lines.push('Linked spending changes with this payment.');var expense=record._expense&&record._expense.record;if(expense){var c=byId(data.categories,expense.category_id),p=byId(data.periods,expense.period_id);if(c)lines.push('Category: '+c.name);if(p)lines.push('Plan: '+p.label);}}
+    else{
+      if(!income&&record.type!=='EXPENSE')lines.push(record.type==='FUND_OUT'?'Withdraw from fund':'Deposit to fund');
+      function category(id){var c=byId(data.categories,id);return c?c.name:id||'';}
+      function periodName(id){var p=byId(data.periods,id);return p?p.label:id||'';}
+      if(!income&&(before||record.category_id))line('Category',before?category(before.category_id):'',category(record.category_id));
+      if(before||record.period_id)line(income||record.type!=='EXPENSE'?'Period':'Plan',before?periodName(before.period_id):'',periodName(record.period_id));
+      if(income){if(before||record.source)line('Source',before&&before.source,record.source);line('Income type',before&&before.kind,record.kind);}
+    }
+    if(before||record.note)line('Note',before&&before.note,record.note);
+    return lines.join('\n');
+  }
+  function reviewChange(title,before,after,confirmLabel,compact){
     if(reviewResolver)return Promise.resolve(false);
+    $('#reviewSummary').hidden=!compact;$('#reviewSummary').textContent=compact||'';$('#reviewDetails').open=!compact;
     $('#reviewTitle').textContent=title;$('#reviewBefore').textContent=before;$('#reviewAfter').textContent=after;$('#reviewConfirm').textContent=confirmLabel||'Save on device';$('#reviewConfirm').classList.toggle('danger',confirmLabel==='Confirm deletion');
     reviewFocus=document.activeElement;if(calendarEditor)$('#recordEditModal').inert=true;if(entityEditor)$('#entityModal').inert=true;$('#entryReview').hidden=false;$('#reviewCancel').focus();
     return new Promise(function(resolve){reviewResolver=resolve;});
@@ -2577,7 +2609,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
     var revision=LedgerPending.loanRevision(ledgerSnapshot,pendingEntries,rec.loanId),after=LedgerPending.validate(cloudSnapshot,pendingEntries,payload,revision);
     var before='Owed before: '+ledgerSnapshot.currency+nf.format(context.loan.total_payable-context.paidMinor/100);
     var remaining='Owed after: '+ledgerSnapshot.currency+nf.format(context.loan.total_payable-(context.paidMinor+payload.values.amountMinor)/100);
-    if(!await reviewChange('Review loan payment',before,recordDescription(after,'LOAN_PAYMENTS')+'\n'+remaining))return false;
+    if(!await reviewChange('Review loan payment',before,recordDescription(after,'LOAN_PAYMENTS')+'\n'+remaining,undefined,compactRecord(after,'LOAN_PAYMENTS')+'\n'+remaining))return false;
     await LedgerLocal.enqueue(payload,revision);delete cids.add;await refreshLocal();$('#fAmount').value='';$('#fNote').value='';if(ledgerSnapshot&&ledgerSnapshot.capabilities.optionalPlanningVersion===1){$('#fPeriod').value='';if(addType==='Expense')$('#fCat').value='';}fillAdd();setMsg('addMsg','Payment saved on this device. It will synchronize when connected.','ok');syncRequested=true;load();return true;
   }
   async function resolveLoanConflict(entry){
@@ -2613,7 +2645,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
   }
   async function submitLocal(t,rec){
     var prepared=prepareLocalEntry(t,rec,LedgerQuery.cents($('#fAmount').value.replace(/[,\s₱]/g,'')),editDraft);
-    if(!await reviewChange(editDraft?'Review entry changes':'Review new '+t.toLowerCase(),editDraft?recordDescription(editDraft.before,prepared.payload.table):'New record · '+prepared.payload.recordId,recordDescription(prepared.after,prepared.payload.table)))return false;
+    if(!await reviewChange(editDraft?'Review entry changes':'Review new '+t.toLowerCase(),editDraft?recordDescription(editDraft.before,prepared.payload.table):'New record · '+prepared.payload.recordId,recordDescription(prepared.after,prepared.payload.table),undefined,compactRecord(prepared.after,prepared.payload.table,editDraft&&editDraft.before)))return false;
     await persistLocalEntry(prepared);editDraft=null;delete cids.add;
     $('#fAmount').value='';$('#fNote').value='';if(ledgerSnapshot&&ledgerSnapshot.capabilities.optionalPlanningVersion===1){$('#fPeriod').value='';if(addType==='Expense')$('#fCat').value='';}fillAdd();setMsg('addMsg','Saved on this device. It will synchronize when connected.','ok');if(calendarEditor)closeCalendarEditor(true);syncRequested=true;load();return true;
   }
@@ -3038,7 +3070,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
   document.addEventListener('keydown',function(e){
     if(!reviewResolver)return;
     if(e.key==='Escape'){e.preventDefault();closeReview(false);}
-    if(e.key==='Tab'){var first=$('#reviewCancel'),last=$('#reviewConfirm');if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}
+    if(e.key==='Tab'){var controls=$$('#entryReview summary, #entryReview button').filter(function(el){return !el.disabled&&el.getClientRects().length>0;}),first=controls[0],last=controls[controls.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}
   });
   $('#assistantInput').addEventListener('focus', function(){ $('.ledger-assistant').classList.add('is-expanded'); });
   $('#assistantForm').addEventListener('submit', function(e){ e.preventDefault(); var input = $('#assistantInput'); var text = input.value.trim(); if(text){askLedger(text); input.value = ''; input.focus();} });
