@@ -438,6 +438,11 @@
   #recordEditBody .card{ margin:0; padding:0; border:0; background:none; }
   #recordEditBody .seg-ctl{ display:none; }
   .btn2.solid.danger{ background:var(--stamp);border-color:var(--stamp); }
+  .form-msg:empty{margin:0;min-height:0;padding:0;}
+  .record-danger p:empty{display:none;}
+  button.rec{width:100%;text-align:left;background:none;color:var(--ink);font:inherit;cursor:pointer;border:0;border-bottom:1px solid var(--rule);}
+  button.rec:focus-visible{outline:2px solid var(--ink);outline-offset:3px;}
+  .history-summary{cursor:pointer;font-weight:600;min-height:44px;line-height:44px;}
   .record-danger{ margin-top:20px; padding-top:16px; border-top:1px solid var(--rule); }
   .record-danger .btn2{ width:100%; color:var(--stamp); border-color:var(--stamp); }
   .record-danger p{ margin:0 0 10px; }
@@ -593,7 +598,7 @@
       <form id="assistantForm" autocomplete="off">
         <label class="sr-only" for="assistantInput">Ask a question or request an action</label>
         <div class="assistant-composer"><input id="assistantInput" type="text" maxlength="300" required placeholder="Ask a question or prepare an entry…" enterkeyhint="send" aria-describedby="assistantHelp"><button id="assistantSend" type="submit" aria-label="Send message"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button></div>
-        <p id="assistantHelp" class="assistant-help">Ask about spending, plans, funds or loans. English or Taglish. Ask a question or prepare an entry; you always confirm before saving.</p>
+        <p id="assistantHelp" class="assistant-help">Ask about your ledger or prepare an entry. You confirm every change.</p>
       </form>
       <div class="assistant-prompts" aria-label="Suggested questions and actions"><span>Try</span><button type="button" data-question="Add an expense">Add an expense</button><button type="button" data-question="What can you do?">What can you do?</button><button type="button" data-question="What's my biggest expense this month?">Biggest expense <span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 18 18 6M6 6h12v12"/></svg></span></button><button type="button" data-question="How much salary did I receive this year?">Salary this year <span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 18 18 6M6 6h12v12"/></svg></span></button></div>
       <div class="assistant-history-head" id="chatHeading" hidden><span>Your conversation</span><button type="button" data-act="clearchat">Clear</button></div>
@@ -652,7 +657,7 @@
       <div class="sheet-head"><h2 id="reviewTitle">Review entry</h2></div>
       <p class="label">Before</p><p class="review-record" id="reviewBefore"></p>
       <p class="label">After</p><p class="review-record" id="reviewAfter"></p>
-      <p class="sub">Nothing changes until you confirm.</p>
+
       <div class="btn-row" style="margin-top:16px"><button class="btn2" id="reviewCancel" type="button">Go back</button><button class="btn2 solid" id="reviewConfirm" type="button">Save on device</button></div>
     </div>
   </div>
@@ -744,7 +749,7 @@
           <li><strong>Income</strong>: salary, bonus or other, with an optional source such as your employer. You can enter more than one per pay period.</li>
           <li><strong>Loan pay</strong>: choose the loan; the amount is filled in with the next installment. Leave <strong>Also count it as spending</strong> ticked if the payment should reduce your budget in a category (for example, Loan Payment).</li>
           </ul>
-          <p>Recent entries appear below the form. Tap Edit for income, expenses, fund movements or loan payments; review before saving. Find an older entry searches the full saved history by category, note, date or ID. A loan payment and its counted spending are edited together. For deletion, tap Delete once, review the affected records, then choose Confirm deletion. You can also open any record and choose Delete record in its editor. Canceling the review changes nothing. Deletions retain history in the Sheet. Fund changes cannot overdraw a fund. Each loan can have one pending new payment; synchronize or resolve it before recording another.</p>
+          <p>The latest five entries appear below the form. Tap a record to edit or delete it. Open History for older records; search the full saved history and load more as needed. A loan payment and its counted spending are edited together. For deletion, tap Delete once, review the affected records, then choose Confirm deletion. You can also open any record and choose Delete record in its editor. Canceling the review changes nothing. Deletions retain history in the Sheet. Fund changes cannot overdraw a fund. Each loan can have one pending new payment; synchronize or resolve it before recording another.</p>
           <h4>Saving offline</h4><p>After your first full download, plans, categories and goals, loan creation and renaming, edits, deletion, settings and pay-period generation also save on this device. Review each change before confirming. Related entries wait for earlier changes to synchronize. Home keeps failed or conflicting proposals for review; never clear app data with changes pending.</p>
           <h4>Funds</h4>
           <p>Every fund with its balance, progress toward its target, how far you have to go, and whether you are on track against your plan so far. <strong>New fund</strong> starts a fund from here.</p>
@@ -2057,7 +2062,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
     var pos = Math.max(s.received, 0.01);
     var sp = clamp(s.spent / pos * 100, 0, 100), fd = clamp(Math.max(s.inFunds, 0) / pos * 100, 0, 100 - sp), un = Math.max(0, 100 - sp - fd);
     h += '<div class="card"><p class="label">Total saved so far</p><p class="hero-num">' + peso(s.saved) + '</p>' +
-      '<p class="sub">Salary received minus spending, this year.</p>' +
+      '<p class="sub">Recorded income minus expenses, this year.</p>' +
       '<div class="split" role="img" aria-label="Where your salary went"><span class="seg spent" style="width:' + sp + '%"></span><span class="seg funds" style="width:' + fd + '%"></span><span class="seg hatch" style="width:' + un + '%"></span></div>' +
       '<ul class="legend3">' +
       legendRow('spent', 'Spent', s.spent, sp) + legendRow('funds', 'Moved to funds', s.inFunds, fd) + legendRow('hatch', 'Not yet assigned', s.unassigned, un) + '</ul></div>';
@@ -2071,10 +2076,10 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
     }
     var act = d.periods.filter(function(p){ return p.hasIncome || p.spent || p.funds; }).reverse().slice(0, 12);
     if (act.length) {
-      h += '<div class="card"><p class="label">Pay periods</p>' + act.map(function(p){
+      h += '<details class="card" id="periodHistory"'+($('#periodHistory')&&$('#periodHistory').open?' open':'')+'><summary class="history-summary">Pay period history</summary>' + act.map(function(p){
         return '<div style="padding:9px 0;border-top:1px solid var(--rule)"><div class="row-head"><p class="row-name">' + esc(perLabel(p)) + '</p><p class="row-amt">' + (p.hasIncome ? peso(p.income) : '—') + '</p></div>' +
           '<p class="row-sub"><span>Spent ' + peso(p.spent) + ' · Funds ' + peso(p.funds) + '</span><span class="mono ' + (p.unassigned < 0 ? 'status bad' : '') + '">' + (p.hasIncome ? 'Left ' + peso(p.unassigned) : '') + '</span></p></div>';
-      }).join('') + '</div>';
+      }).join('') + '</details>';
     }
     return h;
   }
@@ -2559,7 +2564,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
     var r=item.record;$('#fAmount').value=nf.format(r.amount);$('#fDate').value=table==='INCOME'?r.received_date:table==='LOAN_PAYMENTS'?r.paid_date:r.txn_date;$('#fPeriod').value=r.period_id;$('#fNote').value=r.note||'';
     if(table==='INCOME'){$('#fKind').value=r.kind;$('#fSource').value=r.source||'';}else if(table==='LOAN_PAYMENTS'){var expense=ledgerSnapshot.tables.TRANSACTIONS.find(function(x){return x.record.txn_id===r.txn_id;});$('#fLoan').value=r.loan_id;$('#fAlso').checked=!!r.txn_id;fillAdd();if(expense){$('#fCat').value=expense.record.category_id;$('#fPeriod').value=expense.record.period_id;}}else{$('#fCat').value=r.category_id;$('#fDir').value=r.type==='FUND_OUT'?'OUT':'IN';}
     var recordPeriod=table==='LOAN_PAYMENTS'?(expense?expense.record.period_id:''):r.period_id;fillAdd();$('#fPeriod').value=recordPeriod||'';
-    setMsg('addMsg','Changes will be reviewed before saving.');
+    setMsg('addMsg','');
     if(fromCalendar){$('#recordEditTitle').textContent='Edit '+(addType==='Loan'?'loan payment':addType==='Fund'?'fund entry':addType.toLowerCase());$('#recordEditClose').focus();}
   }
   async function submitLoanLocal(rec){
@@ -2656,7 +2661,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
         '<label class="fld"><span class="label">Note (optional)</span><input id="fNote" type="text" maxlength="200" placeholder="e.g. Meralco, groceries"></label>' +
         '<p class="form-msg" id="addMsg" role="alert" aria-live="polite"></p>' +
         '<button class="go" id="addGo" type="submit">Review entry</button><button class="btn2" id="cancelEditBtn" type="button" data-act="canceledit" hidden>Cancel edit</button>' +
-      '</form><div class="card" id="recent"></div><details class="card" id="entryHistory"><summary>Find an older entry</summary><label class="fld" style="margin-top:12px"><span class="label">Search saved history</span><input id="historySearch" type="search" placeholder="Category, note, date or record ID" autocomplete="off"></label><div id="historyList"></div><button class="btn2" type="button" data-act="morehistory" id="historyMore" hidden>Show more</button></details>';
+      '</form><div class="card" id="recent"></div><details class="card" id="entryHistory"><summary class="history-summary">History</summary><label class="fld" style="margin-top:12px"><span class="label">Search saved history</span><input id="historySearch" type="search" placeholder="Search records…" autocomplete="off"></label><div id="historyList"></div><button class="btn2" type="button" data-act="morehistory" id="historyMore" hidden>Show more</button></details>';
   }
   function show(id, on){ var el = $('#' + id); if (el) el.hidden = !on; }
   function fillAdd(){
@@ -2695,8 +2700,8 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
     $('#recordDeleteHelp').textContent=!(cloudSnapshot&&cloudSnapshot.capabilities.operationSyncVersion===1)
       ?'Update Apps Script and refresh online to enable deletion on this device.'
       :editDraft&&editDraft.table==='LOAN_PAYMENTS'
-        ?'Deleting this payment also removes its linked spending entry, if any, and recalculates the loan balance. Review before confirming.'
-        :'Delete the saved record from your totals. Your unsaved edits will not be applied. Review before confirming.';
+        ?(editDraft.before.txn_id?'Also deletes linked spending and recalculates the loan balance.':'Recalculates the loan balance.')
+        :'';
     $('#fDir').disabled=!!editDraft;$('#fLoan').disabled=!!editDraft;
     $$('#addForm .seg-btn').forEach(function(b){b.disabled=!!editDraft || saving;});
     var hint = $('#fHint'), amt = $('#fAmount');
@@ -2719,19 +2724,19 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
   function renderCalendar(){
     if(!ledgerSnapshot||!data)return;
     if(calendarLedger!==ledgerSnapshot.ledgerId){calendarLedger=ledgerSnapshot.ledgerId;calendarDate=data.today;calendarMonth=calendarDate.slice(0,7);}
-    var panel=$('#panel-records');if(!$('#calendarDays'))panel.innerHTML='<section class="card record-calendar" aria-label="Record calendar"><div class="calendar-toolbar"><button class="icon-btn" data-act="calprev" type="button" aria-label="Previous month">‹</button><h2 id="calendarMonth"></h2><button class="icon-btn" data-act="calnext" type="button" aria-label="Next month">›</button></div><div class="calendar-tools"><label class="fld"><span class="label">Go to date</span><input type="date" id="calendarJump" min="2000-01-01" max="2100-12-31"></label><button class="btn2" data-act="caltoday" type="button">Today</button></div><div class="calendar-week" aria-hidden="true"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div><div id="calendarDays" class="calendar-days" role="group" aria-label="Choose a date"></div><p class="hint">Dots mark days with records. Select a day to browse.</p></section><section class="card"><h2 id="calendarHeading" class="h2"></h2><p class="hint" id="calendarCount" role="status"></p><div id="calendarRecords"></div></section>';
+    var panel=$('#panel-records');if(!$('#calendarDays'))panel.innerHTML='<section class="card record-calendar" aria-label="Record calendar"><div class="calendar-toolbar"><button class="icon-btn" data-act="calprev" type="button" aria-label="Previous month">‹</button><h2 id="calendarMonth"></h2><button class="icon-btn" data-act="calnext" type="button" aria-label="Next month">›</button></div><div class="calendar-tools"><label class="fld"><span class="label">Go to date</span><input type="date" id="calendarJump" min="2000-01-01" max="2100-12-31"></label><button class="btn2" data-act="caltoday" type="button">Today</button></div><div class="calendar-week" aria-hidden="true"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div><div id="calendarDays" class="calendar-days" role="group" aria-label="Choose a date"></div><p class="hint">Dots mark recorded activity.</p></section><section class="card"><h2 id="calendarHeading" class="h2"></h2><p class="hint" id="calendarCount" role="status"></p><div id="calendarRecords"></div></section>';
     var model=RecordCalendar.month(calendarMonth),rows=RecordCalendar.records(ledgerSnapshot,pendingEntries),counts={};rows.forEach(function(r){counts[r.date]=(counts[r.date]||0)+1;});
     $('#calendarMonth').textContent=model.label;$('#calendarJump').value=calendarDate;$('#calendarDays').textContent='';
     for(var i=0;i<model.offset;i++){var blank=document.createElement('span');blank.setAttribute('aria-hidden','true');$('#calendarDays').appendChild(blank);}
     model.dates.forEach(function(date,index){var b=document.createElement('button');b.type='button';b.className='calendar-day';b.dataset.act='caldate';b.dataset.date=date;b.textContent=String(index+1);b.setAttribute('aria-label',fmtLong(date)+' · '+(counts[date]||0)+' records');b.setAttribute('aria-pressed',String(date===calendarDate));b.tabIndex=date===calendarDate||calendarDate.slice(0,7)!==calendarMonth&&index===0?0:-1;if(date===data.today)b.setAttribute('aria-current','date');if(counts[date]){var dot=document.createElement('span');dot.className='calendar-dot';dot.setAttribute('aria-hidden','true');b.appendChild(dot);}$('#calendarDays').appendChild(b);});
     $('[data-act="calprev"]').disabled=calendarMonth==='2000-01';$('[data-act="calnext"]').disabled=calendarMonth==='2100-12';
-    var selected=rows.filter(function(r){return r.date===calendarDate;});$('#calendarHeading').textContent=fmtLong(calendarDate);$('#calendarCount').textContent=selected.length?selected.length+' record'+(selected.length===1?'':'s')+' · Tap a record to edit.':'No records for this day.';
+    var selected=rows.filter(function(r){return r.date===calendarDate;});$('#calendarHeading').textContent=fmtLong(calendarDate);$('#calendarCount').textContent=selected.length?selected.length+' record'+(selected.length===1?'':'s'):'No records for this day.';
     $('#calendarRecords').textContent='';selected.forEach(function(r){var b=document.createElement('button');b.type='button';b.className='calendar-record';b.dataset.act='caledit';b.dataset.table=r.table;b.dataset.id=r.id;var info=document.createElement('span'),name=document.createElement('strong'),description=document.createElement('span'),amount=document.createElement('strong');name.textContent=r.note||r.name;description.className='calendar-record-detail';description.textContent=r.kind+' · '+r.name+(r.kind==='Expense'?(r.linked?' · Plan linked':' · No plan linked'):'')+(r.alsoSpend?' · Also counted as spending':'')+(r.status?' · '+r.status:'');info.appendChild(name);info.appendChild(description);amount.className='calendar-record-amount';amount.textContent=peso(r.amount);b.appendChild(info);b.appendChild(amount);$('#calendarRecords').appendChild(b);});
   }
   function selectCalendarDate(date,focus){if(!RecordCalendar.validDate(date))return;calendarDate=date;calendarMonth=date.slice(0,7);renderCalendar();if(focus){var day=$('#calendarDays [data-date="'+date+'"]');if(day)day.focus();}}
   function moveCalendarMonth(delta){var start=new Date(calendarMonth+'-01T00:00:00Z');start.setUTCMonth(start.getUTCMonth()+delta);var month=start.toISOString().slice(0,7);if(month<'2000-01'||month>'2100-12')return;calendarMonth=month;calendarDate=month+'-01';renderCalendar();$('[data-act="'+(delta<0?'calprev':'calnext')+'"]').focus();}
 
-  var historyLimit=40;
+  var historyLimit=10;
   function renderHistory(){
     var box=$('#entryHistory');if(!box||!box.open||!ledgerSnapshot)return;
     var search=$('#historySearch').value.trim().toLowerCase(),rows=[],tables=ledgerSnapshot.tables;
@@ -2740,19 +2745,15 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
       var text=[name,r.note||'',date,id,payment?'Loan payment':income?'Income':r.type].join(' · ');if(!search||text.toLowerCase().includes(search))rows.push({table:table,id:id,date:date,amount:r.amount,name:name,note:r.note||''});
     });});
     rows.sort(function(a,b){return b.date.localeCompare(a.date)||a.id.localeCompare(b.id);});
-    $('#historyList').innerHTML='<p class="sub">'+rows.length+' matching entr'+(rows.length===1?'y':'ies')+'</p>'+rows.slice(0,historyLimit).map(function(r){return '<div class="rec"><p class="rec-name">'+esc(r.name)+'</p><p class="rec-amt">'+peso(r.amount)+'</p><p class="rec-sub">'+esc(fmtLong(r.date)+(r.note?' · '+r.note:''))+'</p><div class="rec-actions"><button class="btn2" type="button" data-act="editentry" data-table="'+r.table+'" data-id="'+esc(r.id)+'">Edit</button></div></div>';}).join('');$('#historyMore').hidden=rows.length<=historyLimit;
+    $('#historyList').innerHTML='<p class="sub">'+rows.length+' record'+(rows.length===1?'':'s')+'</p>'+rows.slice(0,historyLimit).map(function(r){return '<div class="rec"><p class="rec-name">'+esc(r.name)+'</p><p class="rec-amt">'+peso(r.amount)+'</p><p class="rec-sub">'+esc(fmtLong(r.date)+(r.note?' · '+r.note:''))+'</p><div class="rec-actions"><button class="btn2" type="button" data-act="editentry" data-table="'+r.table+'" data-id="'+esc(r.id)+'">Edit</button></div></div>';}).join('');$('#historyMore').hidden=rows.length<=historyLimit;
   }
   function renderRecent(){
-    var d = data, rows = d.recent.map(function(t){
+    var rows=data.recent.slice(0,5).map(function(t){
       var table=t.kind==='income'?'INCOME':t.kind==='txn'?'TRANSACTIONS':t.kind==='loanpay'?'LOAN_PAYMENTS':null;
-      var item=table&&ledgerSnapshot?ledgerSnapshot.tables[table].find(function(x){return x.record[LedgerPending.key(table)]===t.id;}):null;
-      var editable=item&&(table!=='TRANSACTIONS'||!ledgerSnapshot.tables.LOAN_PAYMENTS.some(function(x){return x.record.txn_id===t.id;}));
       var pending=pendingEntries.some(function(e){return e.payload.recordId===t.id;});
-      var actions='<div class="rec-actions">'+(pending?'<span class="pending-tag">Pending sync</span>':'')+(editable?'<button class="btn2" type="button" data-act="editentry" data-table="'+table+'" data-id="'+esc(t.id)+'">Edit</button>':'')+(!pending||(cloudSnapshot&&cloudSnapshot.capabilities.operationSyncVersion===1)?delBtn(t.kind,t.id,t.title+' '+peso(t.amount)):'')+'</div>';
-      return '<div class="rec"><p class="rec-name">' + esc(t.title) + '</p><p class="rec-amt' + (t.dir === 'in' ? ' in' : '') + '">' + (t.dir === 'in' ? '+' : '') + peso(t.amount) + '</p>' +
-        '<p class="rec-sub">' + esc(fmtDate(t.date) + ' · ' + t.sub) + '</p>' + actions + '</div>';
+      return '<button class="rec" type="button" data-act="editentry" data-table="'+table+'" data-id="'+esc(t.id)+'"><span class="rec-name">'+esc(t.title)+'</span><span class="rec-amt'+(t.dir==='in'?' in':'')+'">'+(t.dir==='in'?'+':'')+peso(t.amount)+'</span><span class="rec-sub">'+esc(fmtDate(t.date)+(t.sub?' · '+t.sub:'')+(pending?' · Pending sync':''))+'</span></button>';
     }).join('');
-    $('#recent').innerHTML = '<p class="label">Recent entries</p>' + (rows || '<p class="sub">Nothing yet. Your first entry will show up here.</p>');
+    $('#recent').innerHTML='<p class="label">Recent entries</p>'+(rows||'<p class="sub">No entries yet.</p>');
   }
   function submitAdd(e){
     e.preventDefault(); if (saving || !data || !data.setupDone) return;
@@ -2800,7 +2801,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
       '<div class="btn-row"><button class="btn2 solid" type="button" data-act="newloan">New loan</button></div></div>';
     var fb = $('#loanFormBox');
     if (!loanOpen) {fb.innerHTML = '';if(entityEditor==='loan')finishEntity();}
-    else if(loanDraft&&!$('#loanForm')){fb.innerHTML='<form class="card" id="loanForm" novalidate autocomplete="off"><p class="label">Edit loan</p><label class="fld"><span class="label">Name</span><input id="lName" maxlength="40" value="'+esc(loanDraft.name)+'"></label><label class="fld"><span class="label">Lender</span><input id="lLender" maxlength="40" value="'+esc(loanDraft.lender||'')+'"></label><p class="sub">The existing repayment schedule and payment history are preserved.</p><p class="form-msg" id="loanMsg" role="alert"></p><div class="btn-row"><button class="btn2 solid" type="submit">Review changes</button><button class="btn2" type="button" data-act="loancancel">Cancel</button></div></form>';}
+    else if(loanDraft&&!$('#loanForm')){fb.innerHTML='<form class="card" id="loanForm" novalidate autocomplete="off"><p class="label">Edit loan</p><label class="fld"><span class="label">Name</span><input id="lName" maxlength="40" value="'+esc(loanDraft.name)+'"></label><label class="fld"><span class="label">Lender</span><input id="lLender" maxlength="40" value="'+esc(loanDraft.lender||'')+'"></label><p class="sub">Payment schedule unchanged.</p><p class="form-msg" id="loanMsg" role="alert"></p><div class="btn-row"><button class="btn2 solid" type="submit">Review changes</button><button class="btn2" type="button" data-act="loancancel">Cancel</button></div></form>';}
     else if (!$('#loanForm')) {
       fb.innerHTML = '<form class="card" id="loanForm" novalidate autocomplete="off"><p class="label">New loan</p>' +
         '<label class="fld"><span class="label">Name</span><input id="lName" type="text" maxlength="40" placeholder="e.g. Billease 5k"></label>' +
@@ -2835,7 +2836,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
       if(paid)paidCards.push(card);else h+=card;
     });
     if(d.loans.length&&paidCards.length===d.loans.length)h='<div class="card"><p class="h2">No active loans</p><p class="sub">Your completed loans and payment history are kept below.</p></div>';
-    if(paidCards.length)h+='<details class="card paid-loans" id="paidLoans"'+(paidExpanded?' open':'')+'><summary>Paid loans ('+paidCards.length+')</summary><p class="sub">Completed loans are kept here with their payment history.</p>'+paidCards.join('')+'</details>';
+    if(paidCards.length)h+='<details class="card paid-loans" id="paidLoans"'+(paidExpanded?' open':'')+'><summary>Paid loans ('+paidCards.length+')</summary>'+paidCards.join('')+'</details>';
     $('#loanList').innerHTML = h;
   }
   function loanPreview(){
@@ -2948,7 +2949,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
     else if(act==='calprev')moveCalendarMonth(-1);
     else if(act==='calnext')moveCalendarMonth(1);
     else if(act==='caltoday')selectCalendarDate(data.today,true);
-    else if(act==='morehistory'){historyLimit+=40;renderHistory();}
+    else if(act==='morehistory'){historyLimit+=10;renderHistory();}
     else if(act==='deleterecord'){if(editDraft)onDelete(editDraft.table==='INCOME'?'income':editDraft.table==='LOAN_PAYMENTS'?'loanpay':'txn',editDraft.id);}
     else if(act==='editentry'||act==='caledit')editEntry(t.getAttribute('data-table'),id,true);
     else if(act==='canceledit')cancelEdit();
@@ -2984,7 +2985,7 @@ return {optionalPlanningVersion:1,schemas:schemas,hash:hash,domain:domain,contex
   document.addEventListener('toggle',function(e){if(e.target.id==='entryHistory')renderHistory();},true);
   document.addEventListener('input', function(e){
     if(e.target.id==='personalityChaos'){savePersonality(false);return;}
-    if(e.target.id==='historySearch'){historyLimit=40;renderHistory();return;}
+    if(e.target.id==='historySearch'){historyLimit=10;renderHistory();return;}
     var f = e.target && e.target.closest ? e.target.closest('form') : null; if (!f) return;
     if (f.id === 'addForm') delete cids.add; else if (f.id === 'catForm') delete cids.cat; else if (f.id === 'loanForm') { delete cids.loan; loanPreview(); }
   });
